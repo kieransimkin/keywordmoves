@@ -1,0 +1,4 @@
+interface:
+  display_name: "Research Keyword Database"
+  short_description: "Expand and maintain song keyword evidence"
+  default_prompt: "Use $research-keyword-database to inspect a song's current keyword rows, expand its seeds with KeywordMoves, research the plausible candidates, and update the evidence register safely."

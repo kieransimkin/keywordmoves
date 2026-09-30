@@ -128,6 +128,15 @@ python -m ruff check .
 See [docs/plugin-opportunities.md](docs/plugin-opportunities.md) for researched
 next-plugin candidates and access constraints.
 
+## Bundled skill
+
+The repository includes
+[`skills/research-keyword-database`](skills/research-keyword-database/SKILL.md),
+a reusable workflow for inspecting, expanding, researching, validating and
+updating the canonical My Songs keyword register. It keeps KeywordMoves
+candidate generation separate from external demand evidence, requires explicit
+LLM selection, and preserves the register's evidence and lifecycle semantics.
+
 ## Potential problems
 
 ### The Hugging Face model is not installed or cannot be downloaded
@@ -189,3 +198,62 @@ next-plugin candidates and access constraints.
 - **Action:** retain the SPDX expression and remove the redundant classifier.
 - **Verification:** current Setuptools completed wheel and source-distribution
   metadata generation.
+
+### Pytest passes but cannot create its cache in the managed workspace
+
+- **Symptom:** all tests pass, followed by `PytestCacheWarning: could not create
+  cache path` and `PermissionError: [WinError 5]` for a temporary
+  `pytest-cache-files-*` directory.
+- **Cause in the managed Windows workspace:** pytest's cache provider creates a
+  temporary directory beside `.pytest_cache` before atomically renaming it, and
+  that cache-only write was denied. The tests themselves had completed.
+- **Action that worked:** when cross-session `--lf`/`--ff` state is not needed,
+  run `python -m pytest -p no:cacheprovider`. Do not hide unrelated warnings.
+- **Verification:** all 17 tests passed again without the cache warning.
+- **Source checked:** pytest's maintained `cacheprovider.py`, accessed 1 October
+  2026: <https://github.com/pytest-dev/pytest/blob/main/src/_pytest/cacheprovider.py>.
+
+### `python -m build` resolves the ignored output folder instead of PyPA Build
+
+- **Symptom:** Python reports `No module named build.__main__; 'build' is a
+  package and cannot be directly executed` while the repository contains an
+  ignored `build/` directory.
+- **Cause when verified:** the selected project environment did not contain the
+  PyPA Build frontend, so Python resolved the local `build/` directory as a
+  namespace package. Its `build.__file__` was `None` and its only path was the
+  repository output folder.
+- **Action:** install the declared `dev` extra, which now includes PyPA Build,
+  before invoking `python -m build`. For an already provisioned external build
+  interpreter, run from the parent directory and pass the repository as the
+  explicit source argument so the output folder cannot shadow the frontend.
+- **Verification:** PyPA Build 1.6.1 produced the source distribution and copied
+  the bundled skill, schema reference and UI metadata into it.
+- **Source checked:** PyPA Build's CLI documentation, accessed 1 October 2026:
+  <https://build.pypa.io/en/latest/reference/cli.html>.
+
+### The `tar` command resolves to the old WinAVR utility
+
+- **Symptom:** `Get-Command tar` points at
+  `C:\WinAVR-20100110\utils\bin\tar.exe`, and archive inspection fails instead
+  of listing the source distribution.
+- **Action:** do not use that executable for release QA. Inspect `.tar.gz`
+  source distributions read-only with Python's standard `tarfile` module, and
+  use PowerShell `Expand-Archive` for ZIP files.
+- **Verification:** `tarfile` confirmed all three
+  `skills/research-keyword-database` files in the built source distribution.
+
+### PowerShell parses punctuation inside a complex inline Python check
+
+- **Symptom:** an inline `python -c` archive check containing a quoted version
+  requirement with a comma and `<` fails in Windows PowerShell before Python
+  starts, with parser errors such as `The '<' operator is reserved for future
+  use`.
+- **Cause:** the nested native-command quoting did not preserve the intended
+  Python argument through Windows PowerShell 5.1.
+- **Action:** avoid a densely nested inline assertion. Pass complex code through
+  a reviewed script or safely encoded argument; for the current QA, narrow the
+  read-only assertion to the required archive member names.
+- **Verification:** the corrected `tarfile` check ran and confirmed the skill,
+  schema and UI metadata in the final source archive.
+- **Source checked:** Microsoft PowerShell `about_Parsing`, accessed 1 October
+  2026: <https://learn.microsoft.com/powershell/module/microsoft.powershell.core/about/about_parsing>.
