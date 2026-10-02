@@ -1,0 +1,31 @@
+{
+  "schema": "keywordmoves-bing-webmaster/v1",
+  "engine": "Bing",
+  "source": "Synthetic reviewed Bing Webmaster export",
+  "observed_at": "2026-10-02",
+  "context": {
+    "site_url": "https://example.com/",
+    "scope": "web:all-devices:all-countries:query-pages",
+    "report_type": "query-pages",
+    "granularity": "period",
+    "start_date": "2026-09-15",
+    "end_date": "2026-09-28"
+  },
+  "rows": [
+    {
+      "query": "paper plane song",
+      "page": "https://example.com/music/",
+      "clicks": 30,
+      "impressions": 1000,
+      "average_click_position": 4,
+      "average_impression_position": 5
+    },
+    {
+      "query": "paper plane song",
+      "page": "https://example.com/live/",
+      "clicks": 2,
+      "impressions": 200,
+      "average_impression_position": 9
+    }
+  ]
+}

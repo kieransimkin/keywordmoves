@@ -630,3 +630,12 @@ observations. The existing `search-console`, `google-ads` and generic provider
 plugins remain unchanged. See [Google Search guide](google-search.md) for the
 operation matrix, permissions, exact evidence meanings, setup, examples and
 unimplemented avenues. Ads competition is never treated as organic difficulty.
+
+## Bing Search workbench
+
+The `bing-search` plugin adds read-only Bing Webmaster property and keyword
+research, Bing-specific provider SERPs and planning metrics, controlled browser
+autocomplete, organic competition observations and compatible local comparisons.
+It never routes requests to the retired Azure Bing Search APIs or relabels Google
+metrics as Bing data. See [the Bing Search guide](bing-search.md) for all 39
+operations, provider requirements, schemas, exact option names and limitations.

@@ -5,6 +5,7 @@ from typing import Any, Callable
 
 
 def factories() -> dict[str, Callable[[], Any]]:
+    from .bing_search import BingSearchPlugin
     from .commercial import (
         AhrefsPlugin,
         DataForSEOPlugin,
@@ -35,7 +36,7 @@ def factories() -> dict[str, Callable[[], Any]]:
     from .youtube import YouTubePlugin
 
     classes = (
-        AhrefsPlugin, AlsoAskedPlugin, AnswerThePublicPlugin, BingAutocompletePlugin,
+        BingSearchPlugin, AhrefsPlugin, AlsoAskedPlugin, AnswerThePublicPlugin, BingAutocompletePlugin,
         BraveSuggestPlugin, DataForSEOPlugin, DatamusePlugin, DuckDuckGoAutocompletePlugin,
         GoogleAdsPlugin, GoogleAutocompletePlugin, KeywordsEverywherePlugin, KeywordToolPlugin,
         SearchConsolePlugin, SemrushPlugin, SerpAPIPlugin, UbersuggestPlugin,

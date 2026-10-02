@@ -1,0 +1,28 @@
+{
+  "schema": "keywordmoves-bing-observations/v1",
+  "engine": "Bing",
+  "observations": [
+    {
+      "phrase": "paper plane song",
+      "source": "Synthetic licensed Bing keyword report",
+      "scope": "Bing-owned-only:GB:English",
+      "metric": "estimated_search_volume",
+      "unit": "searches_per_month",
+      "value": 1500,
+      "observed_at": "2026-10-02",
+      "geography": "GB",
+      "period_start": "2026-09-01",
+      "period_end": "2026-09-30"
+    },
+    {
+      "phrase": "paper plane song",
+      "source": "Synthetic licensed Bing difficulty report",
+      "scope": "Bing-US:provider-example",
+      "metric": "organic_difficulty",
+      "unit": "provider_index_0_100",
+      "value": null,
+      "observed_at": "2026-10-02",
+      "geography": "US"
+    }
+  ]
+}

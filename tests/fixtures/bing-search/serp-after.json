@@ -1,0 +1,44 @@
+{
+  "schema": "keywordmoves-bing-serp/v1",
+  "engine": "Bing",
+  "source": "Synthetic reviewed Bing results",
+  "observed_at": "2026-10-02T12:00:00+00:00",
+  "context": {
+    "query": "paper plane song",
+    "market": "en-GB",
+    "language": "en",
+    "device": "desktop",
+    "location": "Brighton, England, United Kingdom"
+  },
+  "organic": [
+    {
+      "rank": 2,
+      "url": "https://example.com/music/",
+      "title": "Paper Plane Song",
+      "snippet": "A fictional song about flight."
+    },
+    {
+      "rank": 1,
+      "url": "https://shop.example.net/a",
+      "title": "Music collection",
+      "snippet": "Paper planes and melodies."
+    },
+    {
+      "rank": 3,
+      "url": "https://other.example.org/",
+      "title": "Live performance",
+      "snippet": "Live show"
+    }
+  ],
+  "related": [
+    "paper plane lyrics"
+  ],
+  "questions": [
+    "Who wrote paper plane song?"
+  ],
+  "features": [
+    "related_questions",
+    "ads"
+  ],
+  "total_results_estimate": 999999
+}

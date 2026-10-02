@@ -1,0 +1,48 @@
+name: bing-search-tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  bing-search:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - run: python -m pip install -e ".[dev,online]"
+      - name: Lint Bing implementation and tests
+        run: >-
+          python -m ruff check
+          src/keywordmoves/online/bing_search.py
+          src/keywordmoves/online/bing_search_analysis.py
+          src/keywordmoves/online/bing_search_providers.py
+          src/keywordmoves/online/bing_webmaster.py
+          src/keywordmoves/online/bing_search_imports.py
+          tests/test_bing_webmaster.py
+          tests/test_bing_search_providers.py
+          tests/test_bing_search_analysis.py
+          tests/test_bing_search_imports.py
+          docs/examples/bing-search-workflow.py
+      - name: Test without credentials or billable requests
+        run: >-
+          python -m pytest
+          tests/test_bing_webmaster.py
+          tests/test_bing_search_providers.py
+          tests/test_bing_search_analysis.py
+          tests/test_bing_search_imports.py
+          tests/test_registry.py tests/test_online_transport.py
+      - name: Run synthetic end-to-end example
+        run: python docs/examples/bing-search-workflow.py

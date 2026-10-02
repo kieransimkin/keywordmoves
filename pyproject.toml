@@ -50,6 +50,7 @@ dev = [
 keywordmoves = "keywordmoves.cli:main"
 
 [project.entry-points."keywordmoves.plugins"]
+bing-search = "keywordmoves.online.bing_search:BingSearchPlugin"
 reddit = "keywordmoves.online.reddit:RedditPlugin"
 google-search = "keywordmoves.online.google_search:GoogleSearchPlugin"
 youtube = "keywordmoves.online.youtube:YouTubePlugin"
