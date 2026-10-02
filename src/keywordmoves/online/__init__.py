@@ -20,6 +20,7 @@ def factories() -> dict[str, Callable[[], Any]]:
         WikipediaPlugin,
     )
     from .google import GoogleAdsPlugin, SearchConsolePlugin
+    from .google_search import GoogleSearchPlugin
     from .instagram import InstagramPlugin
     from .tiktok import TikTokPlugin
     from .websites import (
@@ -38,6 +39,6 @@ def factories() -> dict[str, Callable[[], Any]]:
         BraveSuggestPlugin, DataForSEOPlugin, DatamusePlugin, DuckDuckGoAutocompletePlugin,
         GoogleAdsPlugin, GoogleAutocompletePlugin, KeywordsEverywherePlugin, KeywordToolPlugin,
         SearchConsolePlugin, SemrushPlugin, SerpAPIPlugin, UbersuggestPlugin,
-        WebsiteKeywordsPlugin, WikipediaPlugin, InstagramPlugin, TikTokPlugin, YouTubePlugin,
+        WebsiteKeywordsPlugin, WikipediaPlugin, InstagramPlugin, TikTokPlugin, YouTubePlugin, GoogleSearchPlugin,
     )
     return {plugin.descriptor.name: plugin for plugin in classes}

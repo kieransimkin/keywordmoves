@@ -1,0 +1,31 @@
+{
+  "schema": "keywordmoves-google-observations/v1",
+  "observations": [
+    {
+      "phrase": "paper plane song",
+      "metric": "estimated_search_volume",
+      "value": 300,
+      "unit": "searches_per_month",
+      "source": "synthetic-provider",
+      "scope": "synthetic-Google-UK-en",
+      "country": "GB",
+      "language": "en",
+      "observed_at": "2026-09-08",
+      "window": "12-month-average",
+      "approximate": false
+    },
+    {
+      "phrase": "paper plane song",
+      "metric": "organic_keyword_difficulty",
+      "value": 28,
+      "unit": "provider_index_0_100",
+      "source": "synthetic-provider",
+      "scope": "synthetic-Google-UK-en",
+      "country": "GB",
+      "language": "en",
+      "observed_at": "2026-09-08",
+      "window": "snapshot",
+      "approximate": false
+    }
+  ]
+}

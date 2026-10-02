@@ -50,6 +50,7 @@ dev = [
 keywordmoves = "keywordmoves.cli:main"
 
 [project.entry-points."keywordmoves.plugins"]
+google-search = "keywordmoves.online.google_search:GoogleSearchPlugin"
 youtube = "keywordmoves.online.youtube:YouTubePlugin"
 tiktok = "keywordmoves.online.tiktok:TikTokPlugin"
 instagram = "keywordmoves.online.instagram:InstagramPlugin"

@@ -618,3 +618,15 @@ SERPs, opt-in collection jobs, explicit exports, and comparable observations.
 Hashtags, video tags and plain queries remain distinct; sampled views are not
 global hashtag popularity. See [the YouTube guide](youtube.md) for all 29
 operations, source/access limitations, derived-metric controls and examples.
+
+
+## Google Search workbench
+
+The `google-search` plugin adds expanded, read-only Search Console reports and
+analysis, Google autocomplete/PAA/related-query discovery, native planning data,
+provider keyword estimates, organic SERP snapshots, explicit backlink lookups,
+competitor-keyword discovery, technical page context and comparable historical
+observations. The existing `search-console`, `google-ads` and generic provider
+plugins remain unchanged. See [Google Search guide](google-search.md) for the
+operation matrix, permissions, exact evidence meanings, setup, examples and
+unimplemented avenues. Ads competition is never treated as organic difficulty.

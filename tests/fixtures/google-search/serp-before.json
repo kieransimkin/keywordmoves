@@ -1,0 +1,41 @@
+{
+  "schema": "keywordmoves-google-serp/v1",
+  "query": "paper plane song",
+  "source": "synthetic-demo",
+  "scope": "synthetic:UK:desktop:top3",
+  "observed_at": "2026-09-08T12:00:00Z",
+  "country": "uk",
+  "language": "en",
+  "device": "desktop",
+  "location": null,
+  "engine": "google",
+  "organic": [
+    {
+      "position": 1,
+      "title": "Paper plane song and music",
+      "url": "https://other.example/a"
+    },
+    {
+      "position": 2,
+      "title": "Music and flight",
+      "url": "https://example.com/music/paper-planes"
+    },
+    {
+      "position": 3,
+      "title": "Paper plane song playlist",
+      "url": "https://playlist.example/p"
+    }
+  ],
+  "features_returned": [
+    "ads",
+    "related_questions"
+  ],
+  "suggestions": [
+    {
+      "phrase": "who wrote paper planes",
+      "kind": "people-also-ask"
+    }
+  ],
+  "approximate_total_results": 123000,
+  "exhaustive": false
+}

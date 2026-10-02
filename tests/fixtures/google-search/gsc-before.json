@@ -1,0 +1,49 @@
+{
+  "schema": "keywordmoves-google-search-console/v1",
+  "site_url": "sc-domain:example.com",
+  "source_scope": "synthetic-demo:byPage",
+  "search_type": "web",
+  "data_state": "final",
+  "aggregation_type": "byPage",
+  "filters": [],
+  "dimensions": [
+    "query",
+    "page"
+  ],
+  "start_date": "2026-09-01",
+  "end_date": "2026-09-07",
+  "observed_at": "2026-09-08",
+  "complete_query_inventory": false,
+  "rows": [
+    {
+      "dimensions": {
+        "query": "paper plane song",
+        "page": "https://example.com/music/paper-planes"
+      },
+      "clicks": 8,
+      "impressions": 800,
+      "ctr": 0.01,
+      "position": 8
+    },
+    {
+      "dimensions": {
+        "query": "paper plane song",
+        "page": "https://example.com/music/archive"
+      },
+      "clicks": 4,
+      "impressions": 200,
+      "ctr": 0.02,
+      "position": 12
+    },
+    {
+      "dimensions": {
+        "query": "independent music",
+        "page": "https://example.com/music"
+      },
+      "clicks": 30,
+      "impressions": 1000,
+      "ctr": 0.03,
+      "position": 6
+    }
+  ]
+}
