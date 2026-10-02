@@ -111,6 +111,15 @@ unsupported private endpoints, bypass access gates, or present a third-party
 estimate as first-party evidence. Research can be prepared without authorising
 OAuth, account changes, paid tools, public changes, or publication.
 
+When a current check comes from a browser-only, authenticated or otherwise
+non-exportable surface, record it in a reviewed
+`keywordmoves-observations/v1` JSON file and import it with
+`observed-evidence --operation import-observations`. Preserve the actual metric,
+date, platform, scope and unavailable state. Do not add an unsupported scraper.
+If a newly checked source or validation is not yet representable in
+KeywordMoves, extend the tool with the smallest reusable, tested capability in
+the same run, then use it for the current evidence.
+
 ## Decide what enters the register
 
 Add every phrase the analysis identifies as a plausible potential target, even

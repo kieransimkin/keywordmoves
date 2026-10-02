@@ -18,6 +18,7 @@ by name. It must not import or silently select a model provider of its own.
 | Plugin | Kind | What it does |
 | --- | --- | --- |
 | `google-trends` | keyword | Imports Google Trends interest and related-query CSV exports, preserving the distinction between relative index values and absolute search volume. |
+| `observed-evidence` | keyword | Validates and imports dated browser, account and public-tool observations without scraping authenticated or private interfaces. |
 | `text-library` | keyword | Reads `.txt`, `.md`, `.lrc`, or `.csv` files, produces transparent local candidates, then asks a selected LLM plugin for semantic keywords and related concepts. |
 | `huggingface-transformers` | LLM | Runs a local Hugging Face seq2seq or causal instruction model through PyTorch. Its default is the Apache-2.0 `Qwen/Qwen2.5-0.5B-Instruct`, pinned to a reviewed model revision. |
 
@@ -86,6 +87,23 @@ Use the transparent local extractor without any LLM:
 keywordmoves run text-library --operation extract-local --input .\lyrics.txt
 ```
 
+Import a reviewed JSON observation file for Search Console, native platform
+search, autocomplete or a public keyword tool:
+
+```powershell
+keywordmoves run observed-evidence `
+  --operation import-observations `
+  --input .\keyword-observations.json `
+  --format json
+```
+
+The file must use `keywordmoves-observations/v1`. Each observation requires a
+phrase, source, actual metric, observation date and platform. Record blocked,
+empty or unreadable surfaces with `availability: unavailable`; do not turn an
+unavailable check into a zero-demand claim. This importer is the supported
+route for browser-only and authenticated evidence. It deliberately does not
+scrape sites or call private endpoints.
+
 LLM suggestions are labelled as proposals. They do not establish popularity,
 search volume, competition, ranking potential, or suitability on a particular
 platform.
@@ -138,6 +156,25 @@ candidate generation separate from external demand evidence, requires explicit
 LLM selection, and preserves the register's evidence and lifecycle semantics.
 
 ## Potential problems
+
+### Pytest cannot create `tmp_path` under the managed user temp directory
+
+- **Symptom:** a test using `tmp_path` fails before its body runs with
+  `PermissionError: [WinError 5]` below
+  `C:\Users\Kieran\AppData\Local\Temp\pytest-of-Kieran`.
+- **Cause when observed:** the managed process could not create pytest's
+  default per-user temporary hierarchy even though the repository was
+  writable.
+- **Action that worked:** prefer immutable checked-in fixtures when the test
+  does not genuinely require a temporary write. When temporary files are part
+  of the behaviour under test, use a dedicated repository-local
+  `--basetemp` path and remember that pytest clears that exact directory at the
+  start of a run.
+- **Verification:** the observed-evidence validation cases run entirely from
+  checked-in fixtures and the complete suite passes without requesting the
+  inaccessible user-temp directory.
+- **Source checked:** pytest temporary-directory documentation, accessed 1
+  October 2026: <https://docs.pytest.org/en/stable/how-to/tmp_path.html>.
 
 ### The Hugging Face model is not installed or cannot be downloaded
 

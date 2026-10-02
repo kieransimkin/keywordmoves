@@ -36,7 +36,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="keywordmoves",
         description="Modular keyword discovery and evidence analysis.",
     )
-    parser.add_argument("--version", action="version", version="%(prog)s 0.1.0")
+    parser.add_argument("--version", action="version", version="%(prog)s 0.2.0")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     plugins = subparsers.add_parser("plugins", help="List keyword or LLM plugins.")
@@ -120,4 +120,3 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

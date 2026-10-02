@@ -2,7 +2,7 @@ from keywordmoves.registry import LLMRegistry, PluginRegistry
 
 
 def test_builtin_keyword_plugins_are_discoverable():
-    assert PluginRegistry().names() == ("google-trends", "text-library")
+    assert PluginRegistry().names() == ("google-trends", "observed-evidence", "text-library")
 
 
 def test_builtin_llm_plugin_is_discoverable():
@@ -20,7 +20,7 @@ def test_registry_reports_available_names():
         registry.get("missing")
     except Exception as exc:
         assert "google-trends" in str(exc)
+        assert "observed-evidence" in str(exc)
         assert "text-library" in str(exc)
     else:
         raise AssertionError("missing plugin should fail")
-

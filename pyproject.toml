@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "keywordmoves"
-version = "0.1.0"
+version = "0.2.0"
 description = "Modular keyword discovery and evidence analysis for the DanceFlow ecosystem"
 readme = "README.md"
 license = "MIT"
@@ -42,6 +42,7 @@ keywordmoves = "keywordmoves.cli:main"
 
 [project.entry-points."keywordmoves.plugins"]
 google-trends = "keywordmoves.builtin.google_trends:GoogleTrendsPlugin"
+observed-evidence = "keywordmoves.builtin.observed_evidence:ObservedEvidencePlugin"
 text-library = "keywordmoves.builtin.text_library:TextLibraryPlugin"
 
 [project.entry-points."keywordmoves.llms"]
