@@ -1,0 +1,8 @@
+{
+  "schema": "keywordmoves-instagram/v1",
+  "hashtag_stats": [
+    {"name": "UKGarage", "post_count": 10500, "availability": "observed"},
+    {"name": "BassMusic", "post_count_display": "2.5M", "availability": "observed"},
+    {"name": "IndependentMusic", "post_count": null, "availability": "unavailable"}
+  ]
+}

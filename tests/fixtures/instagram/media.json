@@ -1,0 +1,39 @@
+{
+  "schema": "keywordmoves-instagram/v1",
+  "posts": [
+    {
+      "id": "synthetic-001",
+      "caption": "A new independent track from Brighton. #UKGarage #Brighton #IndependentMusic",
+      "timestamp": "2026-10-01T18:00:00Z",
+      "media_type": "VIDEO",
+      "media_product_type": "REELS",
+      "likes": 120,
+      "comments_count": 8,
+      "views": 2400,
+      "reach": 1800,
+      "saved": 15,
+      "shares": 4,
+      "followers": 1000
+    },
+    {
+      "id": "synthetic-002",
+      "caption": "Paper planes over the city at night. #Brighton #IndependentMusic",
+      "timestamp": "2026-10-01T20:00:00Z",
+      "media_type": "IMAGE",
+      "likes": 0,
+      "comments_count": null,
+      "views": null,
+      "reach": null,
+      "followers": 1000
+    },
+    {
+      "id": "synthetic-003",
+      "caption": "Low bass and bright lights. #UKGarage #BassMusic",
+      "timestamp": "2026-09-29T12:00:00Z",
+      "media_type": "VIDEO",
+      "likes": 80,
+      "comments_count": 4,
+      "views": 1200
+    }
+  ]
+}
