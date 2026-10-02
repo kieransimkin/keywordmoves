@@ -42,7 +42,8 @@ raise SystemExit(main(['plugins','--json']))
                             env={**os.environ,"PYTHONPATH":str(root/"src")},capture_output=True,text=True,check=True)
     names = {v["name"] for v in json.loads(result.stdout) if v["kind"] == "keyword"}
     assert set(factories()).issubset(names)
-    assert len(factories()) == 22
+    assert len(factories()) == 23
+    assert "reddit" in names
     assert "instagram" in names
     assert "tiktok" in names
     assert "youtube" in names

@@ -1,0 +1,37 @@
+{
+  "schema": "synthetic-example-records",
+  "records": [
+    {
+      "id": "t3_synthetica",
+      "kind": "t3",
+      "title": "Paper planes and late-night music #UKGarage",
+      "body": "Independent music production in Brighton. r/Music",
+      "subreddit": "music",
+      "score": 12,
+      "num_comments": 4,
+      "upvote_ratio": 0.9,
+      "flair": "Original music",
+      "created_at": "2026-10-01T12:00:00Z"
+    },
+    {
+      "id": "t3_syntheticb",
+      "kind": "t3",
+      "title": "Paper planes #UKGarage",
+      "body": "Brighton music producers share studio ideas.",
+      "subreddit": "musicproduction",
+      "score": -1,
+      "num_comments": 0,
+      "upvote_ratio": null,
+      "created_at": "2026-09-29T12:00:00Z"
+    },
+    {
+      "id": "t3_syntheticc",
+      "kind": "t3",
+      "title": "Other topic",
+      "body": "[deleted]",
+      "subreddit": "music",
+      "score": 50,
+      "num_comments": 30
+    }
+  ]
+}
