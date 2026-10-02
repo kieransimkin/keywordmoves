@@ -59,8 +59,12 @@ def _keyword_builtins() -> dict[str, Callable[[], Any]]:
 
 def _llm_builtins() -> dict[str, Callable[[], Any]]:
     from .builtin.huggingface_llm import HuggingFaceTransformersLLM
+    from .builtin.openai_llm import OpenAILLM
 
-    return {"huggingface-transformers": HuggingFaceTransformersLLM}
+    return {
+        "huggingface-transformers": HuggingFaceTransformersLLM,
+        "openai": OpenAILLM,
+    }
 
 
 class PluginRegistry(_Registry[Any]):

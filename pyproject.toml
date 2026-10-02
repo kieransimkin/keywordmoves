@@ -24,6 +24,7 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
+openai = ["openai>=3,<4"]
 huggingface = [
   "torch>=2.4,<3",
   "transformers>=4.48,<6",
@@ -46,6 +47,7 @@ observed-evidence = "keywordmoves.builtin.observed_evidence:ObservedEvidencePlug
 text-library = "keywordmoves.builtin.text_library:TextLibraryPlugin"
 
 [project.entry-points."keywordmoves.llms"]
+openai = "keywordmoves.builtin.openai_llm:OpenAILLM"
 huggingface-transformers = "keywordmoves.builtin.huggingface_llm:HuggingFaceTransformersLLM"
 
 [project.urls]

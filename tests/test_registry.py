@@ -6,7 +6,7 @@ def test_builtin_keyword_plugins_are_discoverable():
 
 
 def test_builtin_llm_plugin_is_discoverable():
-    assert LLMRegistry().names() == ("huggingface-transformers",)
+    assert LLMRegistry().names() == ("huggingface-transformers", "openai")
 
 
 def test_registry_caches_instances():

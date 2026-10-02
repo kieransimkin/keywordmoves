@@ -21,6 +21,7 @@ by name. It must not import or silently select a model provider of its own.
 | `observed-evidence` | keyword | Validates and imports dated browser, account and public-tool observations without scraping authenticated or private interfaces. |
 | `text-library` | keyword | Reads `.txt`, `.md`, `.lrc`, or `.csv` files, produces transparent local candidates, then asks a selected LLM plugin for semantic keywords and related concepts. |
 | `huggingface-transformers` | LLM | Runs a local Hugging Face seq2seq or causal instruction model through PyTorch. Its default is the Apache-2.0 `Qwen/Qwen2.5-0.5B-Instruct`, pinned to a reviewed model revision. |
+| `openai` | LLM | Uses OpenAI-hosted text models through the Responses API. Accepts `OPENAI_API_KEY` or `--openai-api-key`; the model is selectable with `--model`. |
 
 Google's official Trends API is currently an access-controlled alpha. The
 built-in plugin therefore supports reproducible CSV exports now rather than
@@ -42,7 +43,7 @@ Install the local PyTorch/Hugging Face runtime when it is needed:
 python -m pip install -e ".[huggingface]"
 ```
 
-The first model-backed run downloads the selected model unless
+The first Hugging Face model-backed run downloads the selected model unless
 `llm_local_files_only=true` is supplied. Model files stay in the configured
 Hugging Face cache; the input text is processed locally and is not sent to a
 hosted API.
@@ -51,6 +52,15 @@ The default Qwen checkpoint is pinned to revision
 `2b01de6d1108f9b2b5e46a726aa678a359b6c03b`. KeywordMoves records the selected
 model and revision in result metadata. A different Hugging Face model remains
 selectable with `--model` and `--option llm_revision=<commit>`.
+
+Install the optional OpenAI runtime separately (no PyTorch required):
+
+```powershell
+python -m pip install -e ".[openai]"
+```
+
+Unlike the local Hugging Face runtime, selecting `--llm openai` sends the
+supplied prompts to OpenAI's hosted API. API usage may incur charges.
 
 ## Use
 
@@ -108,6 +118,39 @@ LLM suggestions are labelled as proposals. They do not establish popularity,
 search volume, competition, ranking potential, or suitability on a particular
 platform.
 
+### Use OpenAI models
+
+Set the key in the current PowerShell session, then explicitly select OpenAI:
+
+```powershell
+$env:OPENAI_API_KEY = "YOUR_OPENAI_API_KEY"
+keywordmoves run text-library `
+  --operation extract `
+  --input .\lyrics.txt `
+  --llm openai `
+  --model gpt-4.1-mini `
+  --option limit=20
+```
+
+Alternatively, supply the key as a command-line argument:
+
+```powershell
+keywordmoves run text-library --operation extract --input .\lyrics.txt --llm openai --openai-api-key "YOUR_OPENAI_API_KEY"
+```
+
+`--openai-api-key` overrides `--option llm_api_key=...` and `OPENAI_API_KEY`.
+Prefer the environment variable: command-line keys may appear in shell history
+or process listings. KeywordMoves does not write the key into result metadata
+or include raw provider error messages in its normal CLI errors.
+
+The default model is `gpt-4.1-mini`; use `--model` to choose another
+Responses-compatible text model available to your API project. The plugin does
+not silently switch providers or models. For a reasoning model, a larger token
+budget may be needed; set `--option llm_max_output_tokens=2048` or higher.
+
+See [docs/openai.md](docs/openai.md) for Bash and Python examples, supported
+options, hosted-data behaviour and troubleshooting.
+
 ## Write a keyword plugin
 
 Implement an object with a `descriptor` and `run(request, context)` method, then
@@ -142,6 +185,10 @@ python -m pip install -e ".[dev]"
 python -m pytest
 python -m ruff check .
 ```
+
+OpenAI unit/CLI tests also run without the optional SDK. To run the additional
+real-SDK transport tests (using in-memory HTTP responses, not billable API
+calls), install `.[dev,openai]`. CI installs that extra and runs both test sets.
 
 See [docs/plugin-opportunities.md](docs/plugin-opportunities.md) for researched
 next-plugin candidates and access constraints.

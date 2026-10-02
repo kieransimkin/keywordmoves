@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 from typing import Any, Sequence
 
-from .errors import KeywordMovesError
+from .errors import ConfigurationError, KeywordMovesError
 from .models import ExecutionContext, PluginRequest
 from .registry import LLMRegistry, PluginRegistry
 
@@ -50,6 +50,12 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--input", action="append", type=Path, default=[])
     run.add_argument("--llm", help="Select an LLM plugin for LLM-backed operations.")
     run.add_argument("--model", help="Select the model within the chosen LLM plugin.")
+    run.add_argument(
+        "--openai-api-key",
+        metavar="KEY",
+        help="OpenAI API key (overrides OPENAI_API_KEY; requires --llm openai). "
+        "Prefer the environment to avoid exposing keys in shell history or process arguments.",
+    )
     run.add_argument("--option", action="append", type=_option, default=[])
     run.add_argument("--format", choices=("json", "text"), default="json")
     return parser
@@ -98,6 +104,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             options["llm"] = args.llm
         if args.model:
             options["llm_model"] = args.model
+        if args.openai_api_key is not None:
+            if options.get("llm") != "openai":
+                raise ConfigurationError("--openai-api-key requires --llm openai.")
+            options["llm_api_key"] = args.openai_api_key
         plugin = keyword_plugins.get(args.plugin)
         result = plugin.run(
             PluginRequest(
