@@ -19,6 +19,7 @@ by name. It must not import or silently select a model provider of its own.
 | --- | --- | --- |
 | `google-trends` | keyword | Imports Google Trends interest and related-query CSV exports, preserving the distinction between relative index values and absolute search volume. |
 | `observed-evidence` | keyword | Validates and imports dated browser, account and public-tool observations without scraping authenticated or private interfaces. |
+| `spacy` | keyword | Extracts proper nouns, noun chunks, named entities and useful noun/adjective phrases from reference text with a local spaCy pipeline. No LLM required. |
 | `text-library` | keyword | Reads `.txt`, `.md`, `.lrc`, or `.csv` files, produces transparent local candidates, then asks a selected LLM plugin for semantic keywords and related concepts. |
 | `huggingface-transformers` | LLM | Runs a local Hugging Face seq2seq or causal instruction model through PyTorch. Its default is the Apache-2.0 `Qwen/Qwen2.5-0.5B-Instruct`, pinned to a reviewed model revision. |
 | `openai` | LLM | Uses OpenAI-hosted text models through the Responses API. Accepts `OPENAI_API_KEY` or `--openai-api-key`; the model is selectable with `--model`. |
@@ -61,6 +62,16 @@ python -m pip install -e ".[openai]"
 
 Unlike the local Hugging Face runtime, selecting `--llm openai` sends the
 supplied prompts to OpenAI's hosted API. API usage may incur charges.
+
+Install the independent spaCy keyword extractor and its English pipeline:
+
+```powershell
+python -m pip install -e ".[spacy]"
+python -m spacy download en_core_web_sm
+```
+
+The pipeline download is an explicit setup step, not something KeywordMoves
+performs automatically. Subsequent extraction with this pipeline is local.
 
 ## Use
 
@@ -117,6 +128,32 @@ scrape sites or call private endpoints.
 LLM suggestions are labelled as proposals. They do not establish popularity,
 search volume, competition, ranking potential, or suitability on a particular
 platform.
+
+### Extract proper nouns and noun chunks with spaCy
+
+```powershell
+keywordmoves run spacy `
+  --operation extract `
+  --input .\reference.txt `
+  --option limit=50
+```
+
+This also extracts named entities, common nouns and contiguous adjective/noun
+keyphrases. To focus only on the requested noun categories, add:
+
+```powershell
+--option "features=proper-nouns,noun-chunks"
+```
+
+Use `--option "text=Your reference text"` for inline input, or repeat `--input`
+for multiple files/directories. Select another installed spaCy pipeline with
+`--option spacy_model=NAME`, **not** the LLM-specific `--model` flag.
+
+Results preserve detector labels, entity types, original surface forms,
+deduplicated occurrence counts and source character offsets. Common-word
+inflections can be merged without singularising names. Scores describe only
+heuristic salience in the reference text, not search demand or model confidence.
+See [docs/spacy.md](docs/spacy.md) for all options, examples and limitations.
 
 ### Use OpenAI models
 
@@ -189,6 +226,11 @@ python -m ruff check .
 OpenAI unit/CLI tests also run without the optional SDK. To run the additional
 real-SDK transport tests (using in-memory HTTP responses, not billable API
 calls), install `.[dev,openai]`. CI installs that extra and runs both test sets.
+
+spaCy API tests use controlled annotated documents and need only the `spacy`
+extra; a separate optional test uses a real `en_core_web_sm` pipeline. See
+[spaCy test instructions](docs/spacy.md#tests) for both routes. CI also includes
+a trained-pipeline smoke-test job.
 
 See [docs/plugin-opportunities.md](docs/plugin-opportunities.md) for researched
 next-plugin candidates and access constraints.
