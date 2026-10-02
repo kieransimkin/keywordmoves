@@ -151,5 +151,5 @@ raise SystemExit(main(["plugins", "--json"]))
                             text=True, capture_output=True, check=True)
     items = json.loads(result.stdout)
     assert {item["name"] for item in items if item["kind"] == "keyword"} == {
-        "google-trends", "observed-evidence", "nltk", "spacy", "text-library",
+        "google-trends", "keybert", "observed-evidence", "nltk", "spacy", "text-library",
     }

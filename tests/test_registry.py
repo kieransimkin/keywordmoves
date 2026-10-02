@@ -2,7 +2,7 @@ from keywordmoves.registry import LLMRegistry, PluginRegistry
 
 
 def test_builtin_keyword_plugins_are_discoverable():
-    assert PluginRegistry().names() == ("google-trends", "nltk", "observed-evidence", "spacy", "text-library")
+    assert PluginRegistry().names() == ("google-trends", "keybert", "nltk", "observed-evidence", "spacy", "text-library")
 
 
 def test_builtin_llm_plugin_is_discoverable():

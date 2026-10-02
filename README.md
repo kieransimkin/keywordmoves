@@ -10,7 +10,7 @@ It keeps two plugin systems deliberately separate:
 - `keywordmoves.plugins` contains keyword sources and analysers.
 - `keywordmoves.llms` contains interchangeable LLM runtimes.
 
-A keyword plugin that needs language-model inference must ask for an LLM plugin
+A keyword plugin that needs generative LLM inference must ask for an LLM plugin
 by name. It must not import or silently select a model provider of its own.
 
 ## Current plugins
@@ -18,6 +18,7 @@ by name. It must not import or silently select a model provider of its own.
 | Plugin | Kind | What it does |
 | --- | --- | --- |
 | `google-trends` | keyword | Imports Google Trends interest and related-query CSV exports, preserving the distinction between relative index values and absolute search volume. |
+| `keybert` | keyword | Ranks literal reference-text phrases with local sentence embeddings; supports cosine similarity, MMR and Max Sum selection. No generative LLM required. |
 | `nltk` | keyword | Extracts proper nouns, grammar-based noun chunks, named entities and keyphrases locally with NLTK. No LLM required. |
 | `observed-evidence` | keyword | Validates and imports dated browser, account and public-tool observations without scraping authenticated or private interfaces. |
 | `spacy` | keyword | Extracts proper nouns, noun chunks, named entities and useful noun/adjective phrases from reference text with a local spaCy pipeline. No LLM required. |
@@ -83,6 +84,16 @@ python -m nltk.downloader punkt_tab averaged_perceptron_tagger_eng maxent_ne_chu
 
 This is also local after setup. KeywordMoves never downloads NLTK data implicitly.
 For offline/custom data directories and smaller installs, see [docs/nltk.md](docs/nltk.md).
+
+Install the independent KeyBERT semantic keyword extractor:
+
+```powershell
+python -m pip install -e ".[keybert]"
+```
+
+Its first model-backed run may download the pinned Sentence Transformers model.
+Text is embedded locally, not sent to a hosted inference API. For prefetching
+and strictly offline use, see [docs/keybert.md](docs/keybert.md).
 
 ## Use
 
@@ -183,6 +194,29 @@ results need not agree. This initial NLTK implementation is English-only.
 Names retain their surface forms; ordinary words can be lemmatised with WordNet.
 See [docs/nltk.md](docs/nltk.md) for all options, resource setup and limitations.
 
+### Rank reference-text phrases with KeyBERT
+
+```powershell
+keywordmoves run keybert `
+  --operation extract `
+  --input .\reference.txt `
+  --option limit=20 `
+  --option max_words=3 `
+  --option method=mmr `
+  --option diversity=0.7
+```
+
+KeyBERT uses embedding similarity, not POS or entity labels. Its default
+selection is `method=cosine`; `mmr` and `maxsum` select more varied phrases.
+Use repeated `--keyword "phrase"` arguments to restrict the vocabulary, or
+`--option "text=Reference text"` for inline input. Select another encoder with
+`--option keybert_model=NAME`, not the LLM-specific `--model` switch.
+
+Candidates retain literal source spans; long references are embedded in
+bounded chunks rather than silently truncated. Scores are not search demand
+or confidence. See [docs/keybert.md](docs/keybert.md) for model caching,
+resource limits, all options and an NLTK/spaCy-to-KeyBERT re-ranking example.
+
 ### Use OpenAI models
 
 Set the key in the current PowerShell session, then explicitly select OpenAI:
@@ -264,6 +298,10 @@ NLTK API tests need the `nltk` extra but no downloaded resources; a separate
 pretrained-model smoke test requires its English data. CI installs that data in
 Linux and Windows jobs and makes a missing-resource skip a failure. See
 [NLTK test instructions](docs/nltk.md#tests).
+
+KeyBERT adapter/API tests use controlled embeddings and do not download models.
+Install `.[dev,keybert]` to run both; separate Linux/Windows CI jobs require a
+real pinned-model smoke test. See [KeyBERT tests](docs/keybert.md#tests).
 
 See [docs/plugin-opportunities.md](docs/plugin-opportunities.md) for researched
 next-plugin candidates and access constraints.
