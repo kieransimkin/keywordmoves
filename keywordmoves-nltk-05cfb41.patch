@@ -1,0 +1,1511 @@
+diff --git a/.github/workflows/tests.yml b/.github/workflows/tests.yml
+index 139f96463959c8435d16fbc0db592b0d2558e9fc..92ab91cde2671016f9d70d194c6bdbe11ec5bc45 100644
+--- a/.github/workflows/tests.yml
++++ b/.github/workflows/tests.yml
+@@ -20,7 +20,7 @@ jobs:
+         with:
+           python-version: ${{ matrix.python-version }}
+           cache: pip
+-      - run: python -m pip install -e ".[dev,openai,spacy]"
++      - run: python -m pip install -e ".[dev,openai,spacy,nltk]"
+       - run: python -m ruff check .
+       - run: python -m pytest --cov=keywordmoves --cov-report=term-missing
+ 
+@@ -37,3 +37,20 @@ jobs:
+       - run: python -m pip install -e ".[dev,spacy]"
+       - run: python -m spacy download en_core_web_sm
+       - run: python -m pytest tests/test_spacy_model.py
++
++  nltk-data:
++    strategy:
++      matrix:
++        os: [ubuntu-latest, windows-latest]
++    runs-on: ${{ matrix.os }}
++    env:
++      KEYWORDMOVES_REQUIRE_NLTK_DATA: "1"
++    steps:
++      - uses: actions/checkout@v5
++      - uses: actions/setup-python@v6
++        with:
++          python-version: "3.12"
++          cache: pip
++      - run: python -m pip install -e ".[dev,nltk]"
++      - run: python -m nltk.downloader -q -e punkt_tab averaged_perceptron_tagger_eng maxent_ne_chunker_tab words stopwords wordnet
++      - run: python -m pytest tests/test_nltk_config.py tests/test_nltk_keywords.py tests/test_nltk_model.py
+diff --git a/README.md b/README.md
+index 34e2766f5f2d5372ba20e6fe93ad582734c6599a..70c32fe2d678335b25cc6d23768894393286b321 100644
+--- a/README.md
++++ b/README.md
+@@ -18,6 +18,7 @@ by name. It must not import or silently select a model provider of its own.
+ | Plugin | Kind | What it does |
+ | --- | --- | --- |
+ | `google-trends` | keyword | Imports Google Trends interest and related-query CSV exports, preserving the distinction between relative index values and absolute search volume. |
++| `nltk` | keyword | Extracts proper nouns, grammar-based noun chunks, named entities and keyphrases locally with NLTK. No LLM required. |
+ | `observed-evidence` | keyword | Validates and imports dated browser, account and public-tool observations without scraping authenticated or private interfaces. |
+ | `spacy` | keyword | Extracts proper nouns, noun chunks, named entities and useful noun/adjective phrases from reference text with a local spaCy pipeline. No LLM required. |
+ | `text-library` | keyword | Reads `.txt`, `.md`, `.lrc`, or `.csv` files, produces transparent local candidates, then asks a selected LLM plugin for semantic keywords and related concepts. |
+@@ -73,6 +74,16 @@ python -m spacy download en_core_web_sm
+ The pipeline download is an explicit setup step, not something KeywordMoves
+ performs automatically. Subsequent extraction with this pipeline is local.
+ 
++Install the alternative NLTK extractor and the data used by its default features:
++
++```powershell
++python -m pip install -e ".[nltk]"
++python -m nltk.downloader punkt_tab averaged_perceptron_tagger_eng maxent_ne_chunker_tab words stopwords wordnet
++```
++
++This is also local after setup. KeywordMoves never downloads NLTK data implicitly.
++For offline/custom data directories and smaller installs, see [docs/nltk.md](docs/nltk.md).
++
+ ## Use
+ 
+ List both plugin layers:
+@@ -155,6 +166,23 @@ inflections can be merged without singularising names. Scores describe only
+ heuristic salience in the reference text, not search demand or model confidence.
+ See [docs/spacy.md](docs/spacy.md) for all options, examples and limitations.
+ 
++### Extract with NLTK
++
++```powershell
++keywordmoves run nltk `
++  --operation extract `
++  --input .\reference.txt `
++  --option limit=50
++```
++
++The `nltk` and `spacy` extractors share feature names and candidate metadata.
++Use `--option "features=proper-nouns,noun-chunks"` to focus on names and noun
++phrases, or `--option "text=Your reference text"` for inline input. NLTK noun
++chunks use a part-of-speech grammar rather than spaCy's dependency parser, so
++results need not agree. This initial NLTK implementation is English-only.
++Names retain their surface forms; ordinary words can be lemmatised with WordNet.
++See [docs/nltk.md](docs/nltk.md) for all options, resource setup and limitations.
++
+ ### Use OpenAI models
+ 
+ Set the key in the current PowerShell session, then explicitly select OpenAI:
+@@ -232,6 +260,11 @@ extra; a separate optional test uses a real `en_core_web_sm` pipeline. See
+ [spaCy test instructions](docs/spacy.md#tests) for both routes. CI also includes
+ a trained-pipeline smoke-test job.
+ 
++NLTK API tests need the `nltk` extra but no downloaded resources; a separate
++pretrained-model smoke test requires its English data. CI installs that data in
++Linux and Windows jobs and makes a missing-resource skip a failure. See
++[NLTK test instructions](docs/nltk.md#tests).
++
+ See [docs/plugin-opportunities.md](docs/plugin-opportunities.md) for researched
+ next-plugin candidates and access constraints.
+ 
+diff --git a/docs/nltk.md b/docs/nltk.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..ca01a86204c5688a9feabce6eb5c43edaae2a4b5
+--- /dev/null
++++ b/docs/nltk.md
+@@ -0,0 +1,281 @@
++# NLTK keyword extraction
++
++`nltk` is a keyword plugin, not an LLM plugin. It implements
++`run(PluginRequest, ExecutionContext) -> PluginResult` and never uses the LLM
++registry. It extracts candidates found in supplied English reference text,
++without calling an API or automatically downloading models or corpora.
++
++## Installation
++
++From the repository root:
++
++```powershell
++python -m pip install -e ".[nltk]"
++python -m nltk.downloader punkt_tab averaged_perceptron_tagger_eng maxent_ne_chunker_tab words stopwords wordnet
++keywordmoves plugins --kind keyword
++```
++
++The optional dependency is `nltk>=3.9.2,<4`. The core remains dependency-free,
++and importing KeywordMoves or listing plugins does not import NLTK. NLTK data
++is installed separately and can change independently of the Python library.
++The plugin records library version and resource identifiers; these are **not**
++checksums or pinned versions of the downloaded data. Archive your approved
++NLTK data directory when exact reproducibility matters.
++
++The selected features determine which data is required:
++
++| Resource | Used for |
++| --- | --- |
++| `punkt_tab` | Pretrained English sentence boundaries, within each input line. |
++| `averaged_perceptron_tagger_eng` | English Penn Treebank part-of-speech tags. |
++| `stopwords` | English stopword filtering. |
++| `maxent_ne_chunker_tab`, `words` | Named entities, only when `entities` is enabled. |
++| `wordnet` | Common-word lemmatisation, only when `lemmatize=true`. |
++
++For names and noun phrases without NER or lemmatisation, a smaller setup is:
++
++```powershell
++python -m nltk.downloader punkt_tab averaged_perceptron_tagger_eng stopwords
++keywordmoves run nltk --operation extract --input .\reference.txt --option "features=proper-nouns,noun-chunks" --option lemmatize=false
++```
++
++Missing resources cause an actionable error containing an explicit installation
++command. A failed selected feature is not silently skipped, substituted with
++another model, or replaced with a download. Use the modern resource names
++above rather than the legacy `punkt`, `averaged_perceptron_tagger`, or
++`maxent_ne_chunker` packages.
++
++### Custom data directory or offline use
++
++In PowerShell, provision data while connected, then set the directory **before**
++starting KeywordMoves:
++
++```powershell
++python -m nltk.downloader -d C:\Models\nltk_data punkt_tab averaged_perceptron_tagger_eng maxent_ne_chunker_tab words stopwords wordnet
++$env:NLTK_DATA = "C:\Models\nltk_data"
++keywordmoves run nltk --operation extract --input .\reference.txt
++```
++
++In Bash/zsh the equivalent variable assignment is:
++
++```bash
++export NLTK_DATA="/path/to/nltk_data"
++```
++
++An offline machine can use a preprovisioned, trusted data directory. The plugin
++uses NLTK's normal resource discovery without modifying its global search path.
++It does not load an arbitrary user-specified pickle or custom model file.
++There is no API key, `--llm`, `--model`, or `nltk_model` option for this plugin.
++
++## Use
++
++File input:
++
++```powershell
++keywordmoves run nltk `
++  --operation extract `
++  --input .\reference.txt `
++  --option limit=50 `
++  --format json
++```
++
++Inline reference text:
++
++```powershell
++keywordmoves run nltk --operation extract --option "text=Kieran Simkin writes independent music in Brighton." --format text
++```
++
++Multiple documents:
++
++```powershell
++keywordmoves run nltk --operation extract --input .\lyrics.txt --input .\notes.md --input .\references
++```
++
++Select only the originally requested features:
++
++```powershell
++keywordmoves run nltk --operation extract --input .\reference.txt --option "features=proper-nouns,noun-chunks"
++```
++
++Enable standalone adjectives and verbs as well as the default features:
++
++```powershell
++keywordmoves run nltk --operation extract --input .\reference.txt --option "features=proper-nouns,noun-chunks,entities,keyphrases,nouns,adjectives,verbs"
++```
++
++Use native NLTK entity labels, for example:
++
++```powershell
++keywordmoves run nltk --operation extract --input .\reference.txt --option features=entities --option "entity_labels=PERSON,ORGANIZATION,GPE"
++```
++
++`ORGANIZATION` is an NLTK label, not spaCy's `ORG`. Entity-label filtering only
++affects the `entities` detector; other enabled detectors may still emit a name.
++`--keyword` is rejected because this plugin requires reference text, not seeds.
++
++## Detectors and normalisation
++
++The default features are `proper-nouns`, `noun-chunks`, `entities`, `keyphrases`
++and `nouns`. Their labels are deliberately shared with the spaCy extractor.
++
++| Feature | Implementation |
++| --- | --- |
++| `proper-nouns` | Individual `NNP`/`NNPS` tokens and contiguous multi-token names, including hyphen connectors. Known adjacent entity boundaries are respected when NER is active. |
++| `noun-chunks` | NLTK `RegexpParser` noun phrases, with leading determiners and possessive pronouns removed. |
++| `entities` | NLTK's multiclass maximum-entropy named-entity chunker; preserves native labels. |
++| `keyphrases` | Contiguous adjective/noun sequences ending in a noun, bounded by `max_words`. No stopword removal that invents adjacency. |
++| `nouns` | Common nouns with tags `NN` or `NNS`. |
++| `adjectives` | Optional standalone `JJ`, `JJR`, `JJS` candidates. |
++| `verbs` | Optional standalone `VB*` candidates; no fabricated verb phrases. |
++
++The noun grammar is recorded verbatim in result metadata:
++
++```text
++NP: {<DT|PRP\$>?<JJ.*>*<NN.*>+}
++```
++
++This is a **shallow POS-based grammar**, not a dependency parser or a trained
++noun-chunk model. It will not reliably retain nested phrases or connectors such
++as "of" inside noun chunks. The entity detector can retain recognised names
++such as "University of Oxford" including their connectors.
++
++By default, ordinary nouns, adjectives and verbs are lowercased and passed to
++WordNet's lemmatiser with their appropriate part of speech. For example, tagged
++common nouns "planes" and "plane" can merge. Spans containing tagged proper
++nouns or recognised entity tokens retain their surface text rather than being
++singularised. Unrecognised or mistagged names cannot be guaranteed protection.
++This plugin does not add WordNet synonyms, synonyms from a thesaurus, or
++unstated concepts; WordNet is used for lemmatisation only.
++
++Whitespace is collapsed and Unicode NFC is used for candidate display and
++case-insensitive deduplication. Original surface forms are retained in metadata.
++URLs/emails are blocked across their constituent tokenizer spans, including
++fragments. Standalone numbers and stopwords are excluded; numbers inside a
++recognised name can remain. Custom stopwords exclude exact candidate phrases
++case-insensitively and participate in common-word filtering, not substring
++matching or deletion from the original reference text.
++
++## Options
++
++All options use `--option KEY=VALUE`, without an `llm_` prefix. Unknown options
++are errors rather than ignored settings.
++
++| Option | Default | Meaning |
++| --- | --- | --- |
++| `text` | None | Inline reference text; can accompany file input. |
++| `language` | `english` | Only English is supported by this implementation. |
++| `features` | Five default detectors above | Comma-separated selection; specifying it replaces the default selection. |
++| `entity_labels` | All native labels | Comma-separated case-sensitive NLTK labels, or `*`. |
++| `stopwords` | Empty | Extra case-insensitive words or complete phrases to exclude. |
++| `lemmatize` | `true` | WordNet lemmatisation of ordinary words; explicit `true` or `false`. |
++| `limit` | `50` | Maximum returned candidates, 1-10,000. |
++| `min_occurrences` | `1` | Minimum distinct detected spans, 1-1,000,000. |
++| `min_length` | `2` | Minimum surface character length, 1-200. |
++| `max_words` | `8` | Maximum lexical tokens per candidate, 1-50. |
++| `max_chars` | `1000000` | Per-document character limit, 1-10,000,000. Oversize input is rejected, never silently truncated. |
++| `max_occurrences` | `10` | Retained location examples per candidate, 0-1,000. Does not reduce counts. |
++| `batch_size` | `16` | Sentences sent to the POS tagger per batch, 1-256. Does not join sentences. |
++
++Python callers use the same keys in `PluginRequest.options`; `features`,
++`entity_labels` and `stopwords` also accept sequences of strings.
++
++```python
++from keywordmoves import PluginRegistry, PluginRequest
++from keywordmoves.models import ExecutionContext
++
++result = PluginRegistry().get("nltk").run(
++    PluginRequest(
++        operation="extract",
++        options={"text": "The bright paper planes fly.", "limit": 20},
++    ),
++    ExecutionContext(llms=None),
++)
++print(result.to_dict())
++```
++
++## Evidence, offsets and ranking
++
++Each candidate has `relationship="nltk-extracted"`, detector labels,
++entity labels, surface forms, a `detected_occurrences` count and
++`document_frequency`. Identical `(source, start_char, end_char)` detections
++from multiple features count **once**; their feature labels are combined.
++A nested shorter phrase is a separate candidate, not a duplicate detection of
++the longer name. Counts refer to detected spans, not a separate exhaustive
++string search or search-engine demand.
++
++Occurrence offsets are zero-based, end-exclusive Python character offsets in
++the UTF-8-decoded reference text after an optional initial BOM is removed.
++CRLF is retained. Offsets are not UTF-8 byte offsets or JavaScript UTF-16 indices.
++Source metadata includes character/token counts and a SHA-256 of the decoded
++text. Stored occurrences are capped separately from total counts; the number
++omitted is reported. There is no separate full-input-text field, but extracted phrases can reproduce
++an entire short input. Names, source paths and phrase locations may be sensitive.
++
++Ranking matches the spaCy plugin's transparent heuristic:
++
++```text
++raw = maximum feature weight * (1 + log2(distinct detected occurrences))
++      + 0.1 * min(word count, 5)
++score = raw / maximum raw score among eligible candidates
++```
++
++Feature weights: entities/proper nouns 4, noun chunks 3, keyphrases 2, nouns 1,
++adjectives/verbs 0.5. Stable tie-breaking uses word count and canonical phrase.
++These are policy choices for ordering text candidates, **not** model confidence,
++search popularity, ranking potential, or evidence of demand. They are not
++calibrated for comparison across unrelated texts or different extractors.
++
++## Input boundaries and limitations
++
++Each `.txt`, `.md`, `.lrc` or `.csv` file is a separate document. Directories
++are traversed in sorted order and resolved file paths are deduplicated. Text is
++not concatenated across documents. Newlines are hard boundaries (helpful for
++lyrics), and the pretrained sentence tokenizer splits within each line. This
++can miss phrases wrapped over multiple lines in prose; it is deliberate rather
++than silently constructing cross-line phrases.
++
++Files are treated as raw text: this does not parse Markdown, remove LRC timing
++codes, or select CSV columns. Empty files are ignored for extraction but retain
++source metadata when another non-empty document is present. English POS/NER
++models can misclassify unfamiliar names, capitalised titles, lyric fragments
++and specialist terminology. Different results from spaCy are expected and
++should be reviewed, not treated as independent confirmation of search demand.
++
++## Tests
++
++```powershell
++python -m pip install -e ".[dev,nltk]"
++python -m pytest tests/test_nltk_config.py tests/test_nltk_keywords.py
++```
++
++Configuration tests run without NLTK. API tests use real NLTK tokenisers,
++`UnigramTagger` and `RegexpParser`, with controlled entity and lemma fixtures;
++they need no external data. They test feature labels, boundaries, unique counts,
++input errors, offset integrity, runtime loading, dependency isolation and CLI
++integration. They do not measure pretrained accuracy.
++
++The optional pretrained test uses the actual English models and WordNet:
++
++```powershell
++python -m nltk.downloader -q -e punkt_tab averaged_perceptron_tagger_eng maxent_ne_chunker_tab words stopwords wordnet
++$env:KEYWORDMOVES_REQUIRE_NLTK_DATA = "1"
++python -m pytest tests/test_nltk_model.py
++```
++
++CI runs API tests in the normal Python-version matrix, plus mandatory
++pretrained-data tests on Linux and Windows. Without the environment flag,
++missing resources skip the optional smoke test; with the flag they fail.
++For restricted Windows workspaces, pytest's `--basetemp` can point to a dedicated
++repository-local temporary directory; pytest clears that directory on each run.
++
++## References checked
++
++Official NLTK documentation, checked 2 October 2026:
++
++- Data installation and `NLTK_DATA`: <https://www.nltk.org/data.html>
++- POS tagging: <https://www.nltk.org/api/nltk.tag.html>
++- Grammar chunker: <https://www.nltk.org/api/nltk.chunk.RegexpParser.html>
++- Named-entity chunking: <https://www.nltk.org/api/nltk.chunk.html>
++- Treebank tokenisation and spans: <https://www.nltk.org/api/nltk.tokenize.TreebankWordTokenizer.html>
++- WordNet lemmatisation: <https://www.nltk.org/api/nltk.stem.wordnet.html>
++- Release notes and modern non-pickle resource support: <https://www.nltk.org/news.html>
+diff --git a/pyproject.toml b/pyproject.toml
+index 25976fea1b645f92c527b360be748ee4a750cb77..4492923366d9f6ed50e4b3e6dc97d3fffd117c08 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -24,6 +24,7 @@ classifiers = [
+ dependencies = []
+ 
+ [project.optional-dependencies]
++nltk = ["nltk>=3.9.2,<4"]
+ spacy = ["spacy>=3.8.11,<4"]
+ openai = ["openai>=3,<4"]
+ huggingface = [
+@@ -43,6 +44,7 @@ dev = [
+ keywordmoves = "keywordmoves.cli:main"
+ 
+ [project.entry-points."keywordmoves.plugins"]
++nltk = "keywordmoves.builtin.nltk_keywords:NLTKKeywordPlugin"
+ google-trends = "keywordmoves.builtin.google_trends:GoogleTrendsPlugin"
+ observed-evidence = "keywordmoves.builtin.observed_evidence:ObservedEvidencePlugin"
+ spacy = "keywordmoves.builtin.spacy_keywords:SpacyKeywordPlugin"
+diff --git a/src/keywordmoves/builtin/nltk_keywords.py b/src/keywordmoves/builtin/nltk_keywords.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..c3ec648f0227eb3595aa61f448487e068bd7fae0
+--- /dev/null
++++ b/src/keywordmoves/builtin/nltk_keywords.py
+@@ -0,0 +1,530 @@
++"""Local English keywords with NLTK POS tags, grammar chunks and named entities.
++
++The optional library and data are loaded on use, never downloaded implicitly.
++Candidates refer to literal spans in reference text, not generated suggestions.
++"""
++from __future__ import annotations
++
++import hashlib
++import math
++import re
++import unicodedata
++from dataclasses import dataclass, field
++from pathlib import Path
++from typing import Any, Iterator, Mapping
++
++from ..errors import ConfigurationError, InputError
++from ..models import (
++    ExecutionContext,
++    KeywordCandidate,
++    KeywordEvidence,
++    PluginDescriptor,
++    PluginRequest,
++    PluginResult,
++)
++
++FEATURE_WEIGHTS = {
++    "entities": 4.0, "proper-nouns": 4.0, "noun-chunks": 3.0,
++    "keyphrases": 2.0, "nouns": 1.0, "adjectives": 0.5, "verbs": 0.5,
++}
++DEFAULT_FEATURES = frozenset(FEATURE_WEIGHTS) - {"adjectives", "verbs"}
++SUFFIXES = {".txt", ".md", ".lrc", ".csv"}
++NP_GRAMMAR = r"NP: {<DT|PRP\$>?<JJ.*>*<NN.*>+}"
++RESOURCE_PATHS = {
++    "punkt_tab": ("tokenizers/punkt_tab/english/",),
++    "averaged_perceptron_tagger_eng": ("taggers/averaged_perceptron_tagger_eng/",),
++    "stopwords": ("corpora/stopwords", "corpora/stopwords.zip/stopwords/"),
++    "maxent_ne_chunker_tab": ("chunkers/maxent_ne_chunker_tab/english_ace_multiclass/",),
++    "words": ("corpora/words", "corpora/words.zip/words/"),
++    "wordnet": ("corpora/wordnet", "corpora/wordnet.zip/wordnet/"),
++}
++ADDRESS_RE = re.compile(r"(?:\b(?:https?://|www\.)\S+|[\w.+-]+@[\w.-]+\.[A-Za-z]{2,})")
++
++
++def _normalise(text: str) -> str:
++    return re.sub(r"\s+", " ", unicodedata.normalize("NFC", text)).strip()
++
++
++def _integer(options: Mapping[str, Any], key: str, default: int, low: int, high: int) -> int:
++    value = options.get(key, default)
++    if isinstance(value, bool) or not re.fullmatch(r"[+]?\d+", str(value)):
++        raise ConfigurationError(f"NLTK {key} must be an integer between {low} and {high}.")
++    result = int(value)
++    if not low <= result <= high:
++        raise ConfigurationError(f"NLTK {key} must be between {low} and {high}.")
++    return result
++
++
++def _boolean(value: Any, key: str) -> bool:
++    if isinstance(value, bool):
++        return value
++    if isinstance(value, str) and value.casefold() in {"true", "false"}:
++        return value.casefold() == "true"
++    raise ConfigurationError(f"NLTK {key} must be true or false.")
++
++
++def _words(value: Any, key: str) -> frozenset[str]:
++    if isinstance(value, str):
++        values = value.split(",")
++    elif isinstance(value, (list, tuple, set, frozenset)):
++        values = value
++    else:
++        raise ConfigurationError(f"NLTK {key} must be a comma-separated string or sequence.")
++    if any(not isinstance(item, str) for item in values):
++        raise ConfigurationError(f"NLTK {key} must contain only strings.")
++    return frozenset(_normalise(item) for item in values if item.strip())
++
++
++@dataclass(frozen=True)
++class _Settings:
++    features: frozenset[str]
++    entity_labels: frozenset[str] | None
++    stopwords: frozenset[str]
++    lemmatize: bool
++    limit: int
++    min_occurrences: int
++    min_length: int
++    max_words: int
++    max_chars: int
++    max_occurrences: int
++    batch_size: int
++
++    @classmethod
++    def parse(cls, options: Mapping[str, Any]) -> _Settings:
++        allowed = {
++            "text", "language", "features", "entity_labels", "stopwords", "lemmatize",
++            "limit", "min_occurrences", "min_length", "max_words", "max_chars",
++            "max_occurrences", "batch_size",
++        }
++        if set(options) - allowed:
++            raise ConfigurationError(
++                "Unsupported NLTK option(s): " + ", ".join(sorted(set(options) - allowed))
++                + ". This is an English NLTK extractor; --model/--llm are LLM options."
++            )
++        if options.get("language", "english") != "english":
++            raise ConfigurationError("NLTK currently supports language=english only.")
++        features = _words(options.get("features", DEFAULT_FEATURES), "features")
++        if not features or features - FEATURE_WEIGHTS.keys():
++            raise ConfigurationError("NLTK features must select from: " + ", ".join(FEATURE_WEIGHTS))
++        labels = None
++        if "entity_labels" in options:
++            labels = _words(options["entity_labels"], "entity_labels")
++            if not labels or ("*" in labels and labels != {"*"}):
++                raise ConfigurationError("NLTK entity_labels must be labels or '*' alone.")
++        return cls(
++            features=features, entity_labels=labels,
++            stopwords=frozenset(x.casefold() for x in _words(options.get("stopwords", ""), "stopwords")),
++            lemmatize=_boolean(options.get("lemmatize", True), "lemmatize"),
++            limit=_integer(options, "limit", 50, 1, 10000),
++            min_occurrences=_integer(options, "min_occurrences", 1, 1, 1000000),
++            min_length=_integer(options, "min_length", 2, 1, 200),
++            max_words=_integer(options, "max_words", 8, 1, 50),
++            max_chars=_integer(options, "max_chars", 1000000, 1, 10000000),
++            max_occurrences=_integer(options, "max_occurrences", 10, 0, 1000),
++            batch_size=_integer(options, "batch_size", 16, 1, 256),
++        )
++
++
++def _documents(request: PluginRequest, cfg: _Settings) -> list[tuple[str, str]]:
++    documents: list[tuple[str, str]] = []
++    if "text" in request.options:
++        text = request.options["text"]
++        if not isinstance(text, str) or not text.strip():
++            raise InputError("NLTK text must be a non-empty reference text string.")
++        documents.append(("inline:text", text))
++    paths: dict[Path, None] = {}
++    try:
++        for value in request.inputs:
++            path = Path(value)
++            if path.is_dir():
++                found = sorted(p for p in path.rglob("*") if p.is_file() and p.suffix.lower() in SUFFIXES)
++                if not found:
++                    raise InputError(f"No supported NLTK text files in directory: {path}.")
++            elif path.is_file():
++                if path.suffix.lower() not in SUFFIXES:
++                    raise InputError(f"Unsupported NLTK input type: {path.suffix or '(none)'}.")
++                found = [path]
++            else:
++                raise InputError(f"NLTK input does not exist: {path}.")
++            for item in found:
++                paths[item.resolve()] = None
++        for path in paths:
++            # Bound the read before parsing; do not truncate and return partial results.
++            with path.open(encoding="utf-8-sig", newline="") as handle:
++                documents.append((str(path), handle.read(cfg.max_chars + 1)))
++    except (OSError, UnicodeError) as exc:
++        raise InputError("Cannot read NLTK input as UTF-8 text; check encoding and permissions.") from exc
++    if not documents or not any(text.strip() for _, text in documents):
++        raise InputError("NLTK needs non-empty reference text via --input or --option text=TEXT.")
++    for source, text in documents:
++        if len(text) > cfg.max_chars:
++            raise InputError(
++                f"NLTK input {source!r} exceeds max_chars={cfg.max_chars}. "
++                "Split the document or explicitly increase --option max_chars; no text was processed."
++            )
++    return documents
++
++
++@dataclass
++class _Candidate:
++    phrase: str
++    word_count: int
++    features: set[str] = field(default_factory=set)
++    entity_labels: set[str] = field(default_factory=set)
++    surfaces: set[str] = field(default_factory=set)
++    locations: dict[tuple[str, int, int], set[str]] = field(default_factory=dict)
++
++    @property
++    def raw_score(self) -> float:
++        return max(FEATURE_WEIGHTS[x] for x in self.features) * (
++            1 + math.log2(len(self.locations))
++        ) + 0.1 * min(self.word_count, 5)
++
++
++def _results(candidates: dict[str, _Candidate], cfg: _Settings) -> tuple[tuple[KeywordCandidate, ...], int]:
++    eligible = [item for item in candidates.values() if len(item.locations) >= cfg.min_occurrences]
++    eligible.sort(key=lambda item: (-item.raw_score, -item.word_count, item.phrase.casefold()))
++    maximum = eligible[0].raw_score if eligible else 1.0
++    results = []
++    for item in eligible[:cfg.limit]:
++        locations = sorted(item.locations.items())
++        occurrences = [
++            {"source": source, "start_char": start, "end_char": end, "features": sorted(features)}
++            for (source, start, end), features in locations[:cfg.max_occurrences]
++        ]
++        results.append(KeywordCandidate(
++            phrase=item.phrase,
++            relationship="nltk-extracted",
++            score=round(item.raw_score / maximum, 6),
++            evidence=(KeywordEvidence(
++                source="nltk", metric="detected_occurrences", value=len(locations), unit="count",
++                notes="Distinct detected spans in supplied text, not search-volume or demand evidence.",
++            ),),
++            metadata={
++                "features": sorted(item.features), "entity_labels": sorted(item.entity_labels),
++                "surface_forms": sorted(item.surfaces), "word_count": item.word_count,
++                "document_frequency": len({loc[0] for loc in item.locations}),
++                "raw_salience": round(item.raw_score, 6), "occurrences": occurrences,
++                "occurrences_omitted": max(0, len(locations) - cfg.max_occurrences),
++            },
++        ))
++    return tuple(results), len(eligible)
++
++
++def _resources(cfg: _Settings) -> tuple[str, ...]:
++    names = ["punkt_tab", "averaged_perceptron_tagger_eng", "stopwords"]
++    if "entities" in cfg.features:
++        names.extend(("maxent_ne_chunker_tab", "words"))
++    if cfg.lemmatize:
++        names.append("wordnet")
++    return tuple(names)
++
++
++def _require_data(nltk: Any, resources: tuple[str, ...]) -> None:
++    missing = []
++    for name in resources:
++        for path in RESOURCE_PATHS[name]:
++            try:
++                nltk.data.find(path)
++                break
++            except LookupError:
++                pass
++        else:
++            missing.append(name)
++    if missing:
++        raise ConfigurationError(
++            "Missing NLTK data. Install explicitly: python -m nltk.downloader "
++            + " ".join(missing)
++            + ". For a custom data directory, set NLTK_DATA before starting KeywordMoves. "
++            "No resources were downloaded automatically."
++        )
++
++
++@dataclass
++class _Runtime:
++    version: str
++    sentences: Any
++    words: Any
++    tagger: Any
++    parser: Any
++    ner: Any
++    lemmatizer: Any
++    stopwords: frozenset[str]
++
++
++@dataclass(frozen=True)
++class _Token:
++    text: str
++    tag: str
++    start: int
++    end: int
++    blocked: bool = False
++
++    @property
++    def proper(self) -> bool:
++        return self.tag in {"NNP", "NNPS"}
++
++
++def _content(token: _Token, stops: frozenset[str]) -> bool:
++    return (
++        not token.blocked and token.tag != "CD"
++        and any(c.isalpha() for c in token.text)
++        and (token.proper or token.text.casefold() not in stops)
++    )
++
++
++def _tree_spans(tree: Any, tagged: list[tuple[str, str]]) -> Iterator[tuple[int, int, str]]:
++    if tree.leaves() != tagged:
++        raise InputError("NLTK chunk output changed token order; source offsets would be invalid.")
++    offset = 0
++    for child in tree:
++        if isinstance(child, tuple):
++            offset += 1
++        else:
++            size = len(child.leaves())
++            if size:
++                yield offset, offset + size, child.label()
++            offset += size
++
++
++def _spans(
++    tokens: list[_Token], tagged: list[tuple[str, str]], entities: list[tuple[int, int, str]],
++    runtime: _Runtime, cfg: _Settings,
++) -> Iterator[tuple[int, int, str, str | None]]:
++    if "entities" in cfg.features:
++        for start, end, label in entities:
++            if cfg.entity_labels is None or cfg.entity_labels == {"*"} or label in cfg.entity_labels:
++                yield start, end, "entities", label
++    if "proper-nouns" in cfg.features:
++        entity_starts = {start for start, _, _ in entities}
++        i = 0
++        while i < len(tokens):
++            if not tokens[i].proper:
++                i += 1
++                continue
++            start = i
++            yield i, i + 1, "proper-nouns", None
++            i += 1
++            while i < len(tokens):
++                if tokens[i].proper and i not in entity_starts:
++                    yield i, i + 1, "proper-nouns", None
++                    i += 1
++                elif (tokens[i].text in {"-", "‐", "‑"} and i + 1 < len(tokens)
++                      and tokens[i + 1].proper and i + 1 not in entity_starts):
++                    yield i + 1, i + 2, "proper-nouns", None
++                    i += 2
++                else:
++                    break
++            if i - start > 1:
++                yield start, i, "proper-nouns", None
++    if "noun-chunks" in cfg.features:
++        for start, end, _ in _tree_spans(runtime.parser.parse(tagged), tagged):
++            while start < end and tokens[start].tag in {"DT", "PRP$"}:
++                start += 1
++            if start < end:
++                yield start, end, "noun-chunks", None
++    stops = runtime.stopwords | cfg.stopwords
++    for i, token in enumerate(tokens):
++        feature = (
++            "nouns" if token.tag in {"NN", "NNS"} else
++            "adjectives" if token.tag.startswith("JJ") else
++            "verbs" if token.tag.startswith("VB") else None
++        )
++        if feature in cfg.features and _content(token, stops):
++            yield i, i + 1, feature, None
++        if "keyphrases" not in cfg.features or not token.tag.startswith("NN"):
++            continue
++        start = i
++        while start > 0 and i - start + 1 < cfg.max_words:
++            previous = tokens[start - 1]
++            if not previous.tag.startswith(("JJ", "NN")) or not _content(previous, stops):
++                break
++            start -= 1
++            yield start, i + 1, "keyphrases", None
++
++
++def _collect(
++    text: str, source: str, tokens: list[_Token], tagged: list[tuple[str, str]],
++    runtime: _Runtime, cfg: _Settings, candidates: dict[str, _Candidate],
++) -> None:
++    entities = list(_tree_spans(runtime.ner.parse(tagged), tagged)) if runtime.ner else []
++    named = {i for start, end, _ in entities for i in range(start, end)}
++    stops = runtime.stopwords | cfg.stopwords
++    lemmas: dict[int, str] = {}
++    for start, end, feature, label in _spans(tokens, tagged, entities, runtime, cfg):
++        span = tokens[start:end]
++        left, right = span[0].start, span[-1].end
++        surface = _normalise(text[left:right])
++        lexical = [t for t in span if any(c.isalnum() for c in t.text)]
++        if (not lexical or len(lexical) > cfg.max_words or len(surface) < cfg.min_length
++            or any(t.blocked for t in span) or not any(_content(t, stops) for t in lexical)):
++            continue
++        protected = feature == "entities" or any(
++            tokens[i].proper or i in named for i in range(start, end)
++        )
++        if protected:
++            phrase = surface
++        else:
++            parts = []
++            for i in range(start, end):
++                token = tokens[i]
++                if i not in lemmas:
++                    pos = {"N": "n", "J": "a", "V": "v"}.get(token.tag[:1])
++                    lemmas[i] = (
++                        runtime.lemmatizer.lemmatize(token.text.lower(), pos=pos)
++                        if cfg.lemmatize and pos else token.text
++                    )
++                parts.append(lemmas[i])
++                if i + 1 < end:
++                    parts.append(text[token.end:tokens[i + 1].start])
++            phrase = _normalise("".join(parts)).casefold()
++        key = phrase.casefold()
++        if key in cfg.stopwords or surface.casefold() in cfg.stopwords:
++            continue
++        if not protected and key in stops:
++            continue
++        item = candidates.setdefault(key, _Candidate(phrase=phrase, word_count=len(lexical)))
++        if protected and feature in {"entities", "proper-nouns"}:
++            item.phrase = surface
++        item.features.add(feature)
++        if label:
++            item.entity_labels.add(label)
++        item.surfaces.add(surface)
++        item.locations.setdefault((source, left, right), set()).add(feature)
++
++
++class NLTKKeywordPlugin:
++    descriptor = PluginDescriptor(
++        name="nltk",
++        summary="Extract proper nouns, grammar-based noun chunks, entities and keyphrases with NLTK.",
++        capabilities=("generate", "extract", "local-inference", "proper-nouns", "noun-chunks"),
++        operations=("extract",),
++    )
++
++    def __init__(self) -> None:
++        self._runtimes: dict[tuple[bool, bool], _Runtime] = {}
++
++    def _load(self, cfg: _Settings) -> _Runtime:
++        try:
++            import nltk
++            from nltk.chunk import RegexpParser
++            from nltk.chunk.named_entity import Maxent_NE_Chunker
++            from nltk.corpus import stopwords
++            from nltk.stem import WordNetLemmatizer
++            from nltk.tag import PerceptronTagger
++            from nltk.tokenize import PunktTokenizer, TreebankWordTokenizer
++        except ImportError as exc:
++            raise ConfigurationError(
++                "The NLTK plugin needs optional dependencies: pip install 'keywordmoves[nltk]'."
++            ) from exc
++        key = ("entities" in cfg.features, cfg.lemmatize)
++        if key not in self._runtimes:
++            _require_data(nltk, _resources(cfg))
++            try:
++                self._runtimes[key] = _Runtime(
++                    version=nltk.__version__, sentences=PunktTokenizer("english"),
++                    words=TreebankWordTokenizer(), tagger=PerceptronTagger(lang="eng"),
++                    parser=RegexpParser(NP_GRAMMAR),
++                    ner=Maxent_NE_Chunker(fmt="multiclass") if key[0] else None,
++                    lemmatizer=WordNetLemmatizer() if cfg.lemmatize else None,
++                    stopwords=frozenset(stopwords.words("english")),
++                )
++            except (LookupError, OSError, ValueError) as exc:
++                raise ConfigurationError(
++                    "Cannot load NLTK data. Reinstall the selected resources with: "
++                    "python -m nltk.downloader " + " ".join(_resources(cfg))
++                ) from exc
++        return self._runtimes[key]
++
++    def run(self, request: PluginRequest, context: ExecutionContext) -> PluginResult:
++        del context
++        if request.operation != "extract":
++            raise ConfigurationError("NLTK operation must be extract.")
++        if request.keywords:
++            raise ConfigurationError(
++                "NLTK extracts from reference text; use --input or --option text, not --keyword."
++            )
++        cfg = _Settings.parse(request.options)
++        documents = _documents(request, cfg)
++        runtime = self._load(cfg)
++        candidates: dict[str, _Candidate] = {}
++        sources = []
++        try:
++            for source, text in documents:
++                count = self._process(text, source, runtime, cfg, candidates)
++                sources.append({
++                    "source": source, "characters": len(text), "tokens": count,
++                    "text_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
++                })
++        except LookupError as exc:
++            raise ConfigurationError(
++                "NLTK data is missing or incomplete. Install explicitly: python -m nltk.downloader "
++                + " ".join(_resources(cfg))
++            ) from exc
++        except (OSError, ValueError) as exc:
++            raise InputError("NLTK could not process the supplied reference text.") from exc
++        keywords, eligible = _results(candidates, cfg)
++        notes = [
++            "NLTK extraction is local; no LLM, hosted API or automatic data download is used.",
++            "Noun chunks use a Penn Treebank POS grammar, not dependency parsing.",
++            "Scores are relative heuristic salience, not confidence, search volume or demand evidence.",
++            "POS and entity annotations are predictions; review names, lyrics and specialist terms.",
++        ]
++        if not keywords:
++            notes.append("No candidates matched the selected features and filters.")
++        return PluginResult(
++            plugin="nltk", operation="extract", keywords=keywords, notes=tuple(notes),
++            metadata={
++                "nltk_version": runtime.version, "language": "english",
++                "resources": list(_resources(cfg)), "noun_chunk_grammar": NP_GRAMMAR,
++                "tagger": "averaged_perceptron_tagger_eng", "sources": sources,
++                "features": sorted(cfg.features), "lemmatize": cfg.lemmatize,
++                "candidate_count": len(candidates), "eligible_count": eligible,
++                "returned_count": len(keywords), "limit": cfg.limit,
++                "score_method": "max_feature_weight * (1 + log2(detected_occurrences)) + 0.1 * min(words, 5); divided by maximum eligible score",
++                "feature_weights": dict(FEATURE_WEIGHTS),
++            },
++        )
++
++    @staticmethod
++    def _process(
++        text: str, source: str, runtime: _Runtime, cfg: _Settings,
++        candidates: dict[str, _Candidate],
++    ) -> int:
++        addresses = [(m.start(), m.end()) for m in ADDRESS_RE.finditer(text)]
++        total = 0
++        batch: list[tuple[list[str], list[tuple[int, int]]]] = []
++
++        def flush() -> None:
++            nonlocal total
++            tagged_sentences = runtime.tagger.tag_sents(words for words, _ in batch)
++            for (words, offsets), tagged in zip(batch, tagged_sentences, strict=True):
++                if [word for word, _ in tagged] != words:
++                    raise InputError("NLTK tagger changed tokens; source offsets would be invalid.")
++                tokens = [
++                    _Token(text[start:end], tag, start, end,
++                           any(start < b and end > a for a, b in addresses))
++                    for (start, end), (_, tag) in zip(offsets, tagged, strict=True)
++                ]
++                _collect(text, source, tokens, tagged, runtime, cfg, candidates)
++                total += len(tokens)
++            batch.clear()
++
++        # Treat lyric line breaks as hard boundaries. Keep original character offsets,
++        # including CRLF, instead of joining lines or removing stopwords before chunking.
++        for line in re.finditer(r"[^\r\n]+", text):
++            for sent_start, sent_end in runtime.sentences.span_tokenize(line.group()):
++                fragment = line.group()[sent_start:sent_end]
++                base = line.start() + sent_start
++                words = runtime.words.tokenize(fragment)
++                offsets = [(base + a, base + b) for a, b in runtime.words.span_tokenize(fragment)]
++                if len(words) != len(offsets):
++                    raise InputError("NLTK tokenizer returned inconsistent source offsets.")
++                if not words:
++                    continue
++                batch.append((words, offsets))
++                if len(batch) >= cfg.batch_size:
++                    flush()
++        if batch:
++            flush()
++        return total
+diff --git a/src/keywordmoves/registry.py b/src/keywordmoves/registry.py
+index 6287e5e3817e517e9c1869a9b700340a283ee8b5..3c340fb232974ca8384ccbacc0ef26126eb219ad 100644
+--- a/src/keywordmoves/registry.py
++++ b/src/keywordmoves/registry.py
+@@ -47,12 +47,14 @@ class _Registry(Generic[T]):
+ 
+ def _keyword_builtins() -> dict[str, Callable[[], Any]]:
+     from .builtin.google_trends import GoogleTrendsPlugin
++    from .builtin.nltk_keywords import NLTKKeywordPlugin
+     from .builtin.observed_evidence import ObservedEvidencePlugin
+     from .builtin.spacy_keywords import SpacyKeywordPlugin
+     from .builtin.text_library import TextLibraryPlugin
+ 
+     return {
+         "google-trends": GoogleTrendsPlugin,
++        "nltk": NLTKKeywordPlugin,
+         "observed-evidence": ObservedEvidencePlugin,
+         "spacy": SpacyKeywordPlugin,
+         "text-library": TextLibraryPlugin,
+diff --git a/tests/fixtures/nltk_reference.txt b/tests/fixtures/nltk_reference.txt
+new file mode 100644
+index 0000000000000000000000000000000000000000..29ada04359872013943390277b185708fbe92914
+--- /dev/null
++++ b/tests/fixtures/nltk_reference.txt
+@@ -0,0 +1,4 @@
++Kieran Simkin writes independent music in Brighton.
++John Smith visited New York and the University of Oxford.
++The bright paper planes fly above the city. The paper planes return.
++Arcadians is a song about ancient mountains and distant stars.
+diff --git a/tests/test_nltk_config.py b/tests/test_nltk_config.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..b946a99ff14049982d0a17c1bc3d27400f3aa76a
+--- /dev/null
++++ b/tests/test_nltk_config.py
+@@ -0,0 +1,155 @@
++"""Input, configuration and discoverability tests without NLTK data or even NLTK."""
++import json
++import os
++import subprocess
++import sys
++from pathlib import Path
++from types import SimpleNamespace
++
++import pytest
++
++from keywordmoves.builtin import nltk_keywords as nk
++from keywordmoves.cli import main
++from keywordmoves.errors import ConfigurationError, InputError
++from keywordmoves.models import ExecutionContext, PluginRequest
++
++
++@pytest.mark.parametrize("options", [
++    {"limit": 0}, {"limit": True}, {"limit": 1.5}, {"limit": "oops"}, {"limit": 10001},
++    {"min_occurrences": 0}, {"min_length": -1}, {"max_words": 0}, {"max_words": 51},
++    {"max_chars": 0}, {"batch_size": 0}, {"max_occurrences": -1},
++    {"max_occurrences": 1001}, {"lemmatize": "yes"}, {"lemmatize": 1},
++    {"language": "german"}, {"language": None}, {"features": ""},
++    {"features": "noun-phrases"}, {"features": ["nouns", 1]}, {"features": False},
++    {"entity_labels": ""}, {"entity_labels": "*,PERSON"}, {"stopwords": 42},
++    {"unknown": True}, {"llm_model": "english"}, {"llm": "openai"},
++])
++def test_invalid_options(options):
++    with pytest.raises(ConfigurationError):
++        nk._Settings.parse(options)
++
++
++def test_valid_options_and_resource_selection():
++    cfg = nk._Settings.parse({"features": ["nouns"], "limit": "7", "stopwords": "Noise,music",
++                              "lemmatize": "false", "max_occurrences": 0})
++    assert cfg.limit == 7 and not cfg.lemmatize
++    assert cfg.stopwords == {"noise", "music"}
++    assert nk._resources(cfg) == ("punkt_tab", "averaged_perceptron_tagger_eng", "stopwords")
++    assert set(nk._resources(nk._Settings.parse({}))) == set(nk.RESOURCE_PATHS)
++
++
++@pytest.mark.parametrize("options", [{}, {"text": ""}, {"text": " \n"}, {"text": True}])
++def test_missing_reference_text(options):
++    with pytest.raises(InputError):
++        nk._documents(PluginRequest(operation="extract", options=options), nk._Settings.parse(options))
++
++
++def test_size_limit_no_truncation():
++    options = {"text": "some text", "max_chars": 3}
++    with pytest.raises(InputError, match="no text was processed"):
++        nk._documents(PluginRequest(operation="extract", options=options), nk._Settings.parse(options))
++
++
++def test_files_preserve_crlf_bom_handling_order_and_deduplication(tmp_path):
++    first = tmp_path / "one.TXT"
++    first.write_bytes(b"\xef\xbb\xbfPaper planes.\r\nBrighton.")
++    folder = tmp_path / "nested"
++    folder.mkdir()
++    second = folder / "two.md"
++    second.write_text("Music.", encoding="utf-8")
++    (folder / "ignored.pdf").write_bytes(b"not text")
++    request = PluginRequest(operation="extract", inputs=(first, tmp_path, first))
++    assert nk._documents(request, nk._Settings.parse({})) == [
++        (str(first.resolve()), "Paper planes.\r\nBrighton."), (str(second.resolve()), "Music."),
++    ]
++    with pytest.raises(InputError, match="max_chars"):
++        nk._documents(request, nk._Settings.parse({"max_chars": 3}))
++
++
++def test_invalid_input_paths_and_encoding(tmp_path):
++    for path in (tmp_path, tmp_path / "missing.txt"):
++        with pytest.raises(InputError):
++            nk._documents(PluginRequest(operation="extract", inputs=(path,)), nk._Settings.parse({}))
++    for name, content in [("bad.exe", b"text"), ("bad.txt", b"\xff"), ("empty.txt", b" \n")]:
++        path = tmp_path / name
++        path.write_bytes(content)
++        with pytest.raises(InputError):
++            nk._documents(PluginRequest(operation="extract", inputs=(path,)), nk._Settings.parse({}))
++
++
++def test_unreadable_file(tmp_path, monkeypatch):
++    path = tmp_path / "text.txt"
++    path.write_text("music", encoding="utf-8")
++
++    def denied(*args, **kwargs):
++        raise PermissionError("denied")
++
++    monkeypatch.setattr(Path, "open", denied)
++    with pytest.raises(InputError, match="permissions"):
++        nk._documents(PluginRequest(operation="extract", inputs=(path,)), nk._Settings.parse({}))
++
++
++def test_missing_dependency_error(monkeypatch):
++    monkeypatch.setitem(sys.modules, "nltk", None)
++    with pytest.raises(ConfigurationError, match=r"keywordmoves\[nltk\]"):
++        nk.NLTKKeywordPlugin()._load(nk._Settings.parse({}))
++
++
++def test_all_missing_resources_reported_without_downloading():
++    calls = []
++
++    def find(path):
++        calls.append(path)
++        raise LookupError(path)
++
++    library = SimpleNamespace(data=SimpleNamespace(find=find))
++    with pytest.raises(ConfigurationError) as error:
++        nk._require_data(library, nk._resources(nk._Settings.parse({})))
++    assert "python -m nltk.downloader" in str(error.value)
++    assert "NLTK_DATA" in str(error.value)
++    for resource in nk.RESOURCE_PATHS:
++        assert resource in str(error.value)
++    assert len(calls) == sum(map(len, nk.RESOURCE_PATHS.values()))
++
++
++def test_zipped_wordnet_resource_is_accepted():
++    calls = []
++
++    def find(path):
++        calls.append(path)
++        if ".zip/" not in path:
++            raise LookupError(path)
++        return path
++
++    nk._require_data(SimpleNamespace(data=SimpleNamespace(find=find)), ("wordnet",))
++    assert calls == ["corpora/wordnet", "corpora/wordnet.zip/wordnet/"]
++
++
++def test_unsupported_operation_and_keyword_seeds():
++    for request in [PluginRequest(operation="generate"),
++                    PluginRequest(operation="extract", keywords=("seed",))]:
++        with pytest.raises(ConfigurationError):
++            nk.NLTKKeywordPlugin().run(request, ExecutionContext(llms=None))
++
++
++def test_cli_errors(capsys):
++    for args, message in [([], "reference text"), (["--option", "limit=0"], "limit"),
++                          (["--model", "english"], "LLM options")]:
++        assert main(["run", "nltk", "--operation", "extract", *args]) == 2
++        assert message in capsys.readouterr().err
++
++
++def test_no_optional_dependencies_needed_to_list_plugins():
++    root = Path(__file__).resolve().parents[1]
++    code = '''import sys
++sys.modules.update({name: None for name in ("nltk", "spacy", "openai", "torch", "transformers")})
++from keywordmoves.cli import main
++raise SystemExit(main(["plugins", "--json"]))
++'''
++    result = subprocess.run([sys.executable, "-c", code], cwd=root,
++                            env={**os.environ, "PYTHONPATH": str(root / "src")},
++                            text=True, capture_output=True, check=True)
++    items = json.loads(result.stdout)
++    assert {item["name"] for item in items if item["kind"] == "keyword"} == {
++        "google-trends", "observed-evidence", "nltk", "spacy", "text-library",
++    }
+diff --git a/tests/test_nltk_keywords.py b/tests/test_nltk_keywords.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..3268e53bc60d96c171a9c89e3ba02c7b92864f6e
+--- /dev/null
++++ b/tests/test_nltk_keywords.py
+@@ -0,0 +1,294 @@
++"""Real NLTK tokenizers, POS tagger and RegexpParser with controlled annotations.
++
++The controlled tag/NER/lemma fixtures do not claim pretrained model accuracy.
++No downloads or external corpora are needed for these API and integration tests.
++"""
++import hashlib
++import json
++from dataclasses import replace
++from pathlib import Path
++from types import SimpleNamespace
++
++import pytest
++
++from keywordmoves.builtin import nltk_keywords as nk
++from keywordmoves.cli import main
++from keywordmoves.errors import ConfigurationError, InputError
++from keywordmoves.models import ExecutionContext, PluginRequest
++
++nltk = pytest.importorskip("nltk")
++
++TAGS = {
++    "Kieran": "NNP", "Simkin": "NNP", "Brighton": "NNP", "Arcadians": "NNPS", "May": "NNP",
++    "Mary": "NNP", "Jane": "NNP", "Mary-Jane": "NNP", "Dr.": "NNP", "Bristol": "NNP",
++    "University": "NNP", "Oxford": "NNP", "John": "NNP", "York": "NNP", "Zoë": "NNP",
++    "writes": "VBZ", "sings": "VBZ", "fly": "VBP", "visit": "VB", "is": "VBZ", "are": "VBP",
++    "paper": "NN", "plane": "NN", "planes": "NNS", "music": "NN", "city": "NN",
++    "ships": "NNS", "studios": "NNS", "bright": "JJ", "independent": "JJ", "new": "JJ",
++    "blue": "JJ", "the": "DT", "The": "DT", "a": "DT", "her": "PRP$", "my": "PRP$",
++    "and": "CC", "of": "IN", "in": "IN", "about": "IN", "they": "PRP", "not": "RB",
++    "n't": "RB", "'s": "POS", "2026": "CD", ".": ".", ",": ",", "!": ".", "-": ":",
++    "``": "``", "''": "''", "(": "-LRB-", ")": "-RRB-",
++}
++
++
++class Entities:
++    def parse(self, tagged):
++        children = []
++        i = 0
++        while i < len(tagged):
++            words = [word for word, _ in tagged[i:i + 3]]
++            if words[:2] == ["Kieran", "Simkin"]:
++                children.append(nltk.Tree("PERSON", tagged[i:i + 2]))
++                i += 2
++            elif words == ["University", "of", "Oxford"]:
++                children.append(nltk.Tree("ORGANIZATION", tagged[i:i + 3]))
++                i += 3
++            elif words[0] in {"Brighton", "Bristol", "Oxford", "York"}:
++                children.append(nltk.Tree("GPE", tagged[i:i + 1]))
++                i += 1
++            else:
++                children.append(tagged[i])
++                i += 1
++        return nltk.Tree("S", children)
++
++
++class Lemmas:
++    def __init__(self):
++        self.calls = []
++
++    def lemmatize(self, word, pos):
++        self.calls.append((word, pos))
++        return {"planes": "plane", "writes": "write", "sings": "sing",
++                "studios": "studio", "ships": "ship"}.get(word, word)
++
++
++@pytest.fixture
++def runtime():
++    return nk._Runtime(
++        version=nltk.__version__, sentences=nltk.tokenize.PunktSentenceTokenizer(),
++        words=nltk.tokenize.TreebankWordTokenizer(),
++        tagger=nltk.tag.UnigramTagger(model=TAGS, backoff=nltk.tag.DefaultTagger("NN")),
++        parser=nltk.RegexpParser(nk.NP_GRAMMAR), ner=Entities(), lemmatizer=Lemmas(),
++        stopwords=frozenset({"the", "a", "of", "in", "and", "her", "my", "they", "are", "is", "may"}),
++    )
++
++
++def run(runtime, text, **options):
++    plugin = nk.NLTKKeywordPlugin()
++    cfg = nk._Settings.parse(options)
++    selected = replace(runtime, ner=runtime.ner if "entities" in cfg.features else None,
++                       lemmatizer=runtime.lemmatizer if cfg.lemmatize else None)
++    plugin._load = lambda cfg: selected
++    return plugin.run(PluginRequest(operation="extract", options={"text": text, **options}),
++                      ExecutionContext(llms=None))
++
++
++def index(result):
++    return {k.phrase: k for k in result.keywords}
++
++
++def test_names_noun_chunks_lemmas_and_noninflated_counts(runtime):
++    text = "Kieran Simkin writes the bright paper planes in Brighton. Kieran Simkin sings."
++    result = run(runtime, text)
++    by = index(result)
++    assert {"Kieran Simkin", "Kieran", "Simkin", "Brighton", "bright paper plane", "paper plane"} <= set(by)
++    name = by["Kieran Simkin"]
++    assert name.evidence[0].value == 2
++    assert {"proper-nouns", "entities", "noun-chunks", "keyphrases"} == set(name.metadata["features"])
++    assert name.metadata["entity_labels"] == ["PERSON"]
++    assert by["bright paper plane"].metadata["surface_forms"] == ["bright paper planes"]
++    assert "not search-volume" in name.evidence[0].notes
++    assert result.metadata["sources"][0]["text_sha256"] == hashlib.sha256(text.encode()).hexdigest()
++    assert result.metadata["noun_chunk_grammar"] == nk.NP_GRAMMAR
++    for candidate in result.keywords:
++        assert 0 < candidate.score <= 1
++        for occurrence in candidate.metadata["occurrences"]:
++            surface = text[occurrence["start_char"]:occurrence["end_char"]]
++            assert nk._normalise(surface) in candidate.metadata["surface_forms"]
++
++
++def test_plural_merging_but_names_untouched(runtime):
++    by = index(run(runtime, "Arcadians sings about planes. A plane.", features="proper-nouns,nouns"))
++    assert "Arcadians" in by and "Arcadian" not in by
++    assert by["plane"].evidence[0].value == 2
++    assert not any(word == "arcadians" for word, _ in runtime.lemmatizer.calls)
++    by = index(run(runtime, "planes. plane.", lemmatize=False, features="nouns"))
++    assert {"plane", "planes"} == set(by)
++
++
++def test_optional_adjectives_and_verbs_pass_wordnet_pos(runtime):
++    text = "Kieran writes independent music."
++    normal = index(run(runtime, text))
++    assert "write" not in normal and "independent" not in normal
++    by = index(run(runtime, text, features="adjectives,verbs"))
++    assert {"write", "independent"} == set(by)
++    assert ("writes", "v") in runtime.lemmatizer.calls
++    assert ("independent", "a") in runtime.lemmatizer.calls
++
++
++def test_grammar_strips_articles_and_possessive_pronouns(runtime):
++    for text in ("the bright paper planes", "her bright paper planes"):
++        assert set(index(run(runtime, text, features="noun-chunks"))) == {"bright paper plane"}
++
++
++def test_entities_keep_connectors_and_native_labels(runtime):
++    by = index(run(runtime, "University of Oxford in Brighton. Kieran Simkin.", features="entities",
++                   entity_labels="ORGANIZATION"))
++    assert set(by) == {"University of Oxford"}
++    assert by["University of Oxford"].metadata["entity_labels"] == ["ORGANIZATION"]
++    assert "Brighton" in index(run(runtime, "Brighton", features="entities", entity_labels="*"))
++
++
++@pytest.mark.parametrize("separator", ["\n", "\r\n", ". ", ", ", " and "])
++def test_no_phrases_across_boundaries(runtime, separator):
++    by = index(run(runtime, "paper" + separator + "planes", features="keyphrases,noun-chunks"))
++    assert "paper plane" not in by
++
++
++def test_line_break_processing_preserves_later_chunk(runtime):
++    by = index(run(runtime, "the\nbright paper planes", features="noun-chunks"))
++    assert "bright paper plane" in by
++
++
++def test_proper_nouns_quoted_hyphenated_and_stopword_names(runtime):
++    by = index(run(runtime, '"Kieran Simkin". Mary - Jane. Mary-Jane. May.', features="proper-nouns"))
++    assert {"Kieran Simkin", "Mary - Jane", "Mary-Jane", "May"} <= set(by)
++    assert "\"Kieran" not in by
++
++
++def test_separate_entities_are_not_joined_as_proper_name(runtime):
++    by = index(run(runtime, "Brighton Bristol", features="entities,proper-nouns"))
++    assert set(by) == {"Brighton", "Bristol"}
++
++
++def test_stopwords_email_urls_and_numbers(runtime):
++    text = "music. 2026. https://example.com/SecretName. user@example.org. planes."
++    by = index(run(runtime, text, features="nouns", stopwords="music"))
++    assert set(by) == {"plane"}
++    assert not run(runtime, "music", features="nouns", stopwords="music").keywords
++    assert "No candidates" in run(runtime, "the", features="nouns").notes[-1]
++
++
++def test_limits_frequency_and_location_cap(runtime):
++    result = run(runtime, "planes. planes. music.", features="nouns", min_occurrences=2,
++                 max_occurrences=1, limit=1)
++    assert len(result.keywords) == 1
++    k = result.keywords[0]
++    assert k.evidence[0].value == 2 and k.metadata["occurrences_omitted"] == 1
++    assert len(k.metadata["occurrences"]) == 1
++    k = run(runtime, "planes.", features="nouns", max_occurrences=0).keywords[0]
++    assert not k.metadata["occurrences"] and k.metadata["occurrences_omitted"] == 1
++    assert not run(runtime, "May", features="proper-nouns", min_length=4).keywords
++    assert not run(runtime, "the bright paper planes", features="noun-chunks", max_words=2).keywords
++
++
++def test_multiple_sources_duplicate_paths_crlf_and_unicode(runtime, tmp_path):
++    text = "Zoë sings.\r\nplanes."
++    first = tmp_path / "first.txt"
++    first.write_bytes(b"\xef\xbb\xbf" + text.encode())
++    plugin = nk.NLTKKeywordPlugin()
++    plugin._load = lambda cfg: runtime
++    result = plugin.run(PluginRequest(operation="extract", inputs=(first, first),
++                                     options={"text": "planes.", "features": "nouns,proper-nouns"}),
++                        ExecutionContext(llms=None))
++    assert len(result.metadata["sources"]) == 2
++    plane = index(result)["plane"]
++    assert plane.metadata["document_frequency"] == 2 and plane.evidence[0].value == 2
++    loc = next(x for x in plane.metadata["occurrences"] if x["source"] != "inline:text")
++    assert text[loc["start_char"]:loc["end_char"]] == "planes"
++    assert "Zoë" in index(result)
++
++
++def test_determinism_and_batch_sizes(runtime):
++    text = "music. plane. Kieran Simkin. Brighton. paper planes."
++    assert run(runtime, text, batch_size=1).to_dict() == run(runtime, text, batch_size=16).to_dict()
++
++
++def test_cli_inline_and_file(runtime, monkeypatch, capsys):
++    monkeypatch.setattr(nk.NLTKKeywordPlugin, "_load", lambda self, cfg: runtime)
++    assert main(["run", "nltk", "--operation", "extract", "--option", "text=Kieran Simkin."]) == 0
++    result = json.loads(capsys.readouterr().out)
++    assert result["plugin"] == "nltk"
++    assert "Kieran Simkin" in {k["phrase"] for k in result["keywords"]}
++    fixture = Path(__file__).parent / "fixtures" / "nltk_reference.txt"
++    assert main(["run", "nltk", "--operation", "extract", "--input", str(fixture),
++                 "--format", "text"]) == 0
++    assert "Kieran Simkin\tnltk-extracted" in capsys.readouterr().out
++
++
++def test_resource_failure_during_inference_is_clean(runtime, monkeypatch, capsys):
++    def missing(*args, **kwargs):
++        raise LookupError("missing corpus")
++
++    runtime.lemmatizer.lemmatize = missing
++    monkeypatch.setattr(nk.NLTKKeywordPlugin, "_load", lambda self, cfg: runtime)
++    assert main(["run", "nltk", "--operation", "extract", "--option", "text=planes."]) == 2
++    assert "python -m nltk.downloader" in capsys.readouterr().err
++
++
++@pytest.mark.parametrize("exception", [OSError("bad data"), ValueError("bad data")])
++def test_processing_failures_are_wrapped(runtime, exception):
++    def fail(*args, **kwargs):
++        raise exception
++
++    runtime.tagger.tag_sents = fail
++    with pytest.raises(InputError, match="could not process"):
++        run(runtime, "planes")
++
++
++def test_inconsistent_tagger_and_chunk_offsets_are_rejected(runtime):
++    runtime.tagger.tag_sents = lambda sents: [[("changed", "NN")]]
++    with pytest.raises(InputError, match="changed tokens"):
++        run(runtime, "planes")
++    with pytest.raises(InputError, match="changed token order"):
++        list(nk._tree_spans(nltk.Tree("S", [("wrong", "NN")]), [("right", "NN")]))
++
++
++def test_inconsistent_tokenizer_offsets(runtime):
++    runtime.words = SimpleNamespace(tokenize=lambda text: ["x"], span_tokenize=lambda text: [])
++    with pytest.raises(InputError, match="inconsistent source offsets"):
++        run(runtime, "planes")
++
++
++def test_real_runtime_loader_caches_and_loads_only_selected_components(runtime, monkeypatch):
++    import nltk.chunk.named_entity
++    import nltk.corpus
++    import nltk.stem
++    import nltk.tag
++    import nltk.tokenize
++
++    calls = []
++    monkeypatch.setattr(nk, "_require_data", lambda library, resources: calls.append(resources))
++    monkeypatch.setattr(nltk.tokenize, "PunktTokenizer", lambda language: runtime.sentences)
++    monkeypatch.setattr(nltk.tag, "PerceptronTagger", lambda lang: runtime.tagger)
++    monkeypatch.setattr(nltk.chunk.named_entity, "Maxent_NE_Chunker", lambda fmt: runtime.ner)
++    monkeypatch.setattr(nltk.stem, "WordNetLemmatizer", lambda: runtime.lemmatizer)
++    monkeypatch.setattr(nltk.corpus, "stopwords", SimpleNamespace(words=lambda lang: runtime.stopwords))
++    plugin = nk.NLTKKeywordPlugin()
++    cfg = nk._Settings.parse({})
++    loaded = plugin._load(cfg)
++    assert plugin._load(cfg) is loaded and len(calls) == 1
++    assert run(loaded, "the bright paper planes").keywords
++    minimal = plugin._load(nk._Settings.parse({"features": "nouns", "lemmatize": False}))
++    assert minimal.ner is None and minimal.lemmatizer is None and len(calls) == 2
++    assert "planes" in index(run(minimal, "planes", features="nouns", lemmatize=False))
++
++
++def test_loading_broken_data_is_actionable(monkeypatch):
++    import nltk.tokenize
++
++    def broken(language):
++        raise ValueError("broken data")
++
++    monkeypatch.setattr(nk, "_require_data", lambda *args: None)
++    monkeypatch.setattr(nltk.tokenize, "PunktTokenizer", broken)
++    with pytest.raises(ConfigurationError, match="Cannot load NLTK data"):
++        nk.NLTKKeywordPlugin()._load(nk._Settings.parse({}))
++
++
++def test_extra_stopwords_filter_names_and_lemmatised_forms(runtime):
++    assert not run(runtime, "Brighton", features="proper-nouns", stopwords="brighton").keywords
++    assert not run(runtime, "planes", features="nouns", stopwords="plane").keywords
++    runtime.stopwords = runtime.stopwords | {"plane"}
++    assert not run(runtime, "planes", features="nouns").keywords
+diff --git a/tests/test_nltk_model.py b/tests/test_nltk_model.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..c1f5ff6049065c85e6eea76db0886fe9255ccae9
+--- /dev/null
++++ b/tests/test_nltk_model.py
+@@ -0,0 +1,40 @@
++"""Optional pretrained-English-model smoke test; mandatory in the nltk-data CI job."""
++import os
++from pathlib import Path
++
++import pytest
++
++from keywordmoves.builtin import nltk_keywords as nk
++from keywordmoves.errors import ConfigurationError
++from keywordmoves.models import ExecutionContext, PluginRequest
++
++
++def test_pretrained_english_pipeline():
++    plugin = nk.NLTKKeywordPlugin()
++    fixture = Path(__file__).parent / "fixtures" / "nltk_reference.txt"
++    try:
++        import nltk
++        nk._require_data(nltk, nk._resources(nk._Settings.parse({})))
++    except (ImportError, ConfigurationError) as exc:
++        if os.environ.get("KEYWORDMOVES_REQUIRE_NLTK_DATA") == "1":
++            pytest.fail(str(exc))
++        pytest.skip(f"Optional NLTK library/data not installed: {exc}")
++    # Corrupt installed models or inference failures must fail, not masquerade as a skip.
++    result = plugin.run(PluginRequest(operation="extract", inputs=(fixture,)),
++                        ExecutionContext(llms=None))
++    assert result.plugin == "nltk" and result.keywords
++    features = {feature for k in result.keywords for feature in k.metadata["features"]}
++    assert {"proper-nouns", "noun-chunks", "entities", "nouns"} <= features
++    assert any(k.metadata["entity_labels"] for k in result.keywords)
++    text = fixture.read_text(encoding="utf-8")
++    for k in result.keywords:
++        for loc in k.metadata["occurrences"]:
++            assert text[loc["start_char"]:loc["end_char"]] in k.metadata["surface_forms"]
++    assert all(k.relationship == "nltk-extracted" for k in result.keywords)
++    # Exercise the non-NER/non-WordNet path using the same genuine pretrained tagger.
++    result = plugin.run(PluginRequest(operation="extract", options={
++        "text": "The bright paper planes fly.", "features": "noun-chunks", "lemmatize": False,
++    }), ExecutionContext(llms=None))
++    assert result.keywords
++    assert "wordnet" not in result.metadata["resources"]
++    assert "maxent_ne_chunker_tab" not in result.metadata["resources"]
+diff --git a/tests/test_registry.py b/tests/test_registry.py
+index 7f73edff62c80b9fb12f63a1489c92b92171b1cb..91c1468a515d260efe1a977b946f6c1dba338237 100644
+--- a/tests/test_registry.py
++++ b/tests/test_registry.py
+@@ -2,7 +2,7 @@ from keywordmoves.registry import LLMRegistry, PluginRegistry
+ 
+ 
+ def test_builtin_keyword_plugins_are_discoverable():
+-    assert PluginRegistry().names() == ("google-trends", "observed-evidence", "spacy", "text-library")
++    assert PluginRegistry().names() == ("google-trends", "nltk", "observed-evidence", "spacy", "text-library")
+ 
+ 
+ def test_builtin_llm_plugin_is_discoverable():
+diff --git a/tests/test_spacy_config.py b/tests/test_spacy_config.py
+index 6e08b25bf14850e8a376efbd64d1dfbab88d5850..46d0d42a7ac938b88b4e901049e10e40849937b5 100644
+--- a/tests/test_spacy_config.py
++++ b/tests/test_spacy_config.py
+@@ -114,7 +114,7 @@ def test_cli_reports_configuration_and_input_errors(capsys):
+ def test_listing_works_when_optional_libraries_cannot_import():
+     root = Path(__file__).resolve().parents[1]
+     code = '''import sys
+-sys.modules.update({name: None for name in ("spacy", "torch", "transformers", "openai")})
++sys.modules.update({name: None for name in ("nltk", "spacy", "torch", "transformers", "openai")})
+ from keywordmoves.cli import main
+ raise SystemExit(main(["plugins", "--json"]))
+ '''
+@@ -123,5 +123,5 @@ raise SystemExit(main(["plugins", "--json"]))
+                             capture_output=True, text=True, check=True)
+     items = json.loads(result.stdout)
+     assert {item["name"] for item in items if item["kind"] == "keyword"} == {
+-        "google-trends", "observed-evidence", "spacy", "text-library",
++        "google-trends", "nltk", "observed-evidence", "spacy", "text-library",
+     }

@@ -24,6 +24,7 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
+nltk = ["nltk>=3.9.2,<4"]
 spacy = ["spacy>=3.8.11,<4"]
 openai = ["openai>=3,<4"]
 huggingface = [
@@ -43,6 +44,7 @@ dev = [
 keywordmoves = "keywordmoves.cli:main"
 
 [project.entry-points."keywordmoves.plugins"]
+nltk = "keywordmoves.builtin.nltk_keywords:NLTKKeywordPlugin"
 google-trends = "keywordmoves.builtin.google_trends:GoogleTrendsPlugin"
 observed-evidence = "keywordmoves.builtin.observed_evidence:ObservedEvidencePlugin"
 spacy = "keywordmoves.builtin.spacy_keywords:SpacyKeywordPlugin"

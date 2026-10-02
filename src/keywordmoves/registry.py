@@ -47,12 +47,14 @@ class _Registry(Generic[T]):
 
 def _keyword_builtins() -> dict[str, Callable[[], Any]]:
     from .builtin.google_trends import GoogleTrendsPlugin
+    from .builtin.nltk_keywords import NLTKKeywordPlugin
     from .builtin.observed_evidence import ObservedEvidencePlugin
     from .builtin.spacy_keywords import SpacyKeywordPlugin
     from .builtin.text_library import TextLibraryPlugin
 
     return {
         "google-trends": GoogleTrendsPlugin,
+        "nltk": NLTKKeywordPlugin,
         "observed-evidence": ObservedEvidencePlugin,
         "spacy": SpacyKeywordPlugin,
         "text-library": TextLibraryPlugin,

@@ -18,6 +18,7 @@ by name. It must not import or silently select a model provider of its own.
 | Plugin | Kind | What it does |
 | --- | --- | --- |
 | `google-trends` | keyword | Imports Google Trends interest and related-query CSV exports, preserving the distinction between relative index values and absolute search volume. |
+| `nltk` | keyword | Extracts proper nouns, grammar-based noun chunks, named entities and keyphrases locally with NLTK. No LLM required. |
 | `observed-evidence` | keyword | Validates and imports dated browser, account and public-tool observations without scraping authenticated or private interfaces. |
 | `spacy` | keyword | Extracts proper nouns, noun chunks, named entities and useful noun/adjective phrases from reference text with a local spaCy pipeline. No LLM required. |
 | `text-library` | keyword | Reads `.txt`, `.md`, `.lrc`, or `.csv` files, produces transparent local candidates, then asks a selected LLM plugin for semantic keywords and related concepts. |
@@ -72,6 +73,16 @@ python -m spacy download en_core_web_sm
 
 The pipeline download is an explicit setup step, not something KeywordMoves
 performs automatically. Subsequent extraction with this pipeline is local.
+
+Install the alternative NLTK extractor and the data used by its default features:
+
+```powershell
+python -m pip install -e ".[nltk]"
+python -m nltk.downloader punkt_tab averaged_perceptron_tagger_eng maxent_ne_chunker_tab words stopwords wordnet
+```
+
+This is also local after setup. KeywordMoves never downloads NLTK data implicitly.
+For offline/custom data directories and smaller installs, see [docs/nltk.md](docs/nltk.md).
 
 ## Use
 
@@ -155,6 +166,23 @@ inflections can be merged without singularising names. Scores describe only
 heuristic salience in the reference text, not search demand or model confidence.
 See [docs/spacy.md](docs/spacy.md) for all options, examples and limitations.
 
+### Extract with NLTK
+
+```powershell
+keywordmoves run nltk `
+  --operation extract `
+  --input .\reference.txt `
+  --option limit=50
+```
+
+The `nltk` and `spacy` extractors share feature names and candidate metadata.
+Use `--option "features=proper-nouns,noun-chunks"` to focus on names and noun
+phrases, or `--option "text=Your reference text"` for inline input. NLTK noun
+chunks use a part-of-speech grammar rather than spaCy's dependency parser, so
+results need not agree. This initial NLTK implementation is English-only.
+Names retain their surface forms; ordinary words can be lemmatised with WordNet.
+See [docs/nltk.md](docs/nltk.md) for all options, resource setup and limitations.
+
 ### Use OpenAI models
 
 Set the key in the current PowerShell session, then explicitly select OpenAI:
@@ -231,6 +259,11 @@ spaCy API tests use controlled annotated documents and need only the `spacy`
 extra; a separate optional test uses a real `en_core_web_sm` pipeline. See
 [spaCy test instructions](docs/spacy.md#tests) for both routes. CI also includes
 a trained-pipeline smoke-test job.
+
+NLTK API tests need the `nltk` extra but no downloaded resources; a separate
+pretrained-model smoke test requires its English data. CI installs that data in
+Linux and Windows jobs and makes a missing-resource skip a failure. See
+[NLTK test instructions](docs/nltk.md#tests).
 
 See [docs/plugin-opportunities.md](docs/plugin-opportunities.md) for researched
 next-plugin candidates and access constraints.

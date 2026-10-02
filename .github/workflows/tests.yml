@@ -20,7 +20,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-      - run: python -m pip install -e ".[dev,openai,spacy]"
+      - run: python -m pip install -e ".[dev,openai,spacy,nltk]"
       - run: python -m ruff check .
       - run: python -m pytest --cov=keywordmoves --cov-report=term-missing
 
@@ -37,3 +37,20 @@ jobs:
       - run: python -m pip install -e ".[dev,spacy]"
       - run: python -m spacy download en_core_web_sm
       - run: python -m pytest tests/test_spacy_model.py
+
+  nltk-data:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      KEYWORDMOVES_REQUIRE_NLTK_DATA: "1"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install -e ".[dev,nltk]"
+      - run: python -m nltk.downloader -q -e punkt_tab averaged_perceptron_tagger_eng maxent_ne_chunker_tab words stopwords wordnet
+      - run: python -m pytest tests/test_nltk_config.py tests/test_nltk_keywords.py tests/test_nltk_model.py

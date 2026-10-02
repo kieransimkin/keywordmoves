@@ -114,7 +114,7 @@ def test_cli_reports_configuration_and_input_errors(capsys):
 def test_listing_works_when_optional_libraries_cannot_import():
     root = Path(__file__).resolve().parents[1]
     code = '''import sys
-sys.modules.update({name: None for name in ("spacy", "torch", "transformers", "openai")})
+sys.modules.update({name: None for name in ("nltk", "spacy", "torch", "transformers", "openai")})
 from keywordmoves.cli import main
 raise SystemExit(main(["plugins", "--json"]))
 '''
@@ -123,5 +123,5 @@ raise SystemExit(main(["plugins", "--json"]))
                             capture_output=True, text=True, check=True)
     items = json.loads(result.stdout)
     assert {item["name"] for item in items if item["kind"] == "keyword"} == {
-        "google-trends", "observed-evidence", "spacy", "text-library",
+        "google-trends", "nltk", "observed-evidence", "spacy", "text-library",
     }
