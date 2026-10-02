@@ -31,11 +31,13 @@ def factories() -> dict[str, Callable[[], Any]]:
         WebsiteKeywordsPlugin,
     )
 
+    from .youtube import YouTubePlugin
+
     classes = (
         AhrefsPlugin, AlsoAskedPlugin, AnswerThePublicPlugin, BingAutocompletePlugin,
         BraveSuggestPlugin, DataForSEOPlugin, DatamusePlugin, DuckDuckGoAutocompletePlugin,
         GoogleAdsPlugin, GoogleAutocompletePlugin, KeywordsEverywherePlugin, KeywordToolPlugin,
         SearchConsolePlugin, SemrushPlugin, SerpAPIPlugin, UbersuggestPlugin,
-        WebsiteKeywordsPlugin, WikipediaPlugin, InstagramPlugin, TikTokPlugin,
+        WebsiteKeywordsPlugin, WikipediaPlugin, InstagramPlugin, TikTokPlugin, YouTubePlugin,
     )
     return {plugin.descriptor.name: plugin for plugin in classes}

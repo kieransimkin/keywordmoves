@@ -1,0 +1,16 @@
+[
+  {
+    "id": "AAAAAaaaa01", "platform": "YouTube",
+    "title": "Paper planes #UKGarage", "description": "#Brighton independent music",
+    "tags": ["independent music", "garage"],
+    "viewCount": 1000, "likeCount": 50, "commentCount": 5,
+    "published_at": "2026-10-01T12:00:00Z", "channel_id": "UCaaaaaaaaaaaaaaaaaaaaaa", "content_type": "video"
+  },
+  {
+    "id": "BBBBBbbbb02", "platform": "YouTube",
+    "title": "#UKGarage short session", "description": "#Brighton #IndependentMusic",
+    "tags": ["garage", "live session"],
+    "viewCount": 500, "likeCount": 20, "commentCount": 0,
+    "published_at": "2026-09-30T12:00:00Z", "channel_id": "UCbbbbbbbbbbbbbbbbbbbbbb", "content_type": "shorts"
+  }
+]

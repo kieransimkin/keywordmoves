@@ -42,9 +42,10 @@ raise SystemExit(main(['plugins','--json']))
                             env={**os.environ,"PYTHONPATH":str(root/"src")},capture_output=True,text=True,check=True)
     names = {v["name"] for v in json.loads(result.stdout) if v["kind"] == "keyword"}
     assert set(factories()).issubset(names)
-    assert len(factories()) == 20
+    assert len(factories()) == 21
     assert "instagram" in names
     assert "tiktok" in names
+    assert "youtube" in names
 
 
 @pytest.mark.parametrize("status", [301,302,307,308,401,402,403,404,429,500,503])

@@ -609,3 +609,12 @@ Commercial Content APIs, Keyword Tool search estimates, bounded Apify jobs,
 experimental public-page reads, reviewed exports and scoped snapshot changes.
 The `tiktok` keyword plugin keeps these measurements separate and never treats
 missing data as zero demand or as proof that a hashtag is banned.
+
+## YouTube-specific research
+
+The `youtube` plugin combines official video/channel/comment/caption discovery,
+authorised search-term and hashtag-referral Analytics, provider suggestions and
+SERPs, opt-in collection jobs, explicit exports, and comparable observations.
+Hashtags, video tags and plain queries remain distinct; sampled views are not
+global hashtag popularity. See [the YouTube guide](youtube.md) for all 29
+operations, source/access limitations, derived-metric controls and examples.

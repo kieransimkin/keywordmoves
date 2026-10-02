@@ -1,0 +1,4 @@
+[
+  {"phrase":"#ukgarage", "kind":"hashtag", "metric":"reported_video_count", "value":1200,
+   "unit":"videos", "window":"all-time", "definition":"Synthetic provider total, not measured data"}
+]
