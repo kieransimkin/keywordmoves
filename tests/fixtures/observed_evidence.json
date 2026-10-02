@@ -1,0 +1,31 @@
+{
+  "schema": "keywordmoves-observations/v1",
+  "observations": [
+    {
+      "phrase": "Arcadians Kieran Simkin",
+      "relationship": "exact-title-and-artist",
+      "source": "YouTube native search",
+      "metric": "result_position",
+      "value": 1,
+      "unit": "ordinal",
+      "observed_at": "2026-10-01",
+      "geography": "GB account surface",
+      "platform": "YouTube",
+      "scope": "signed-in native search",
+      "target_surface": "YouTube track metadata",
+      "source_url": "https://www.youtube.com/results?search_query=Arcadians+Kieran+Simkin"
+    },
+    {
+      "phrase": "Arcadians Kieran Simkin",
+      "relationship": "platform-check",
+      "source": "TikTok native search",
+      "metric": "availability",
+      "value": "unavailable",
+      "unit": "state",
+      "observed_at": "2026-10-01",
+      "platform": "TikTok",
+      "availability": "unavailable",
+      "notes": "The browser exposed no readable result surface."
+    }
+  ]
+}

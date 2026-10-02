@@ -1,0 +1,1079 @@
+diff --git a/.github/workflows/tests.yml b/.github/workflows/tests.yml
+index 73414ccb9d96caef6c7b17d255b7e0e11cc33c2a..3d13089da74953d6bca0eab5f25edc39afabbed4 100644
+--- a/.github/workflows/tests.yml
++++ b/.github/workflows/tests.yml
+@@ -20,6 +20,6 @@ jobs:
+         with:
+           python-version: ${{ matrix.python-version }}
+           cache: pip
+-      - run: python -m pip install -e ".[dev]"
++      - run: python -m pip install -e ".[dev,openai]"
+       - run: python -m ruff check .
+       - run: python -m pytest --cov=keywordmoves --cov-report=term-missing
+diff --git a/README.md b/README.md
+index caeaa71ee7619f461afd7c11bd66bf4ee32b676d..e56404e46c8b9e5ba4136f0f8a623ba7fe460617 100644
+--- a/README.md
++++ b/README.md
+@@ -20,6 +20,7 @@ by name. It must not import or silently select a model provider of its own.
+ | `google-trends` | keyword | Imports Google Trends interest and related-query CSV exports, preserving the distinction between relative index values and absolute search volume. |
+ | `text-library` | keyword | Reads `.txt`, `.md`, `.lrc`, or `.csv` files, produces transparent local candidates, then asks a selected LLM plugin for semantic keywords and related concepts. |
+ | `huggingface-transformers` | LLM | Runs a local Hugging Face seq2seq or causal instruction model through PyTorch. Its default is the Apache-2.0 `Qwen/Qwen2.5-0.5B-Instruct`, pinned to a reviewed model revision. |
++| `openai` | LLM | Uses OpenAI-hosted text models through the Responses API. Accepts `OPENAI_API_KEY` or `--openai-api-key`; the model is selectable with `--model`. |
+ 
+ Google's official Trends API is currently an access-controlled alpha. The
+ built-in plugin therefore supports reproducible CSV exports now rather than
+@@ -41,7 +42,7 @@ Install the local PyTorch/Hugging Face runtime when it is needed:
+ python -m pip install -e ".[huggingface]"
+ ```
+ 
+-The first model-backed run downloads the selected model unless
++The first Hugging Face model-backed run downloads the selected model unless
+ `llm_local_files_only=true` is supplied. Model files stay in the configured
+ Hugging Face cache; the input text is processed locally and is not sent to a
+ hosted API.
+@@ -51,6 +52,15 @@ The default Qwen checkpoint is pinned to revision
+ model and revision in result metadata. A different Hugging Face model remains
+ selectable with `--model` and `--option llm_revision=<commit>`.
+ 
++Install the optional OpenAI runtime separately (no PyTorch required):
++
++```powershell
++python -m pip install -e ".[openai]"
++```
++
++Unlike the local Hugging Face runtime, selecting `--llm openai` sends the
++supplied prompts to OpenAI's hosted API. API usage may incur charges.
++
+ ## Use
+ 
+ List both plugin layers:
+@@ -90,6 +100,39 @@ LLM suggestions are labelled as proposals. They do not establish popularity,
+ search volume, competition, ranking potential, or suitability on a particular
+ platform.
+ 
++### Use OpenAI models
++
++Set the key in the current PowerShell session, then explicitly select OpenAI:
++
++```powershell
++$env:OPENAI_API_KEY = "YOUR_OPENAI_API_KEY"
++keywordmoves run text-library `
++  --operation extract `
++  --input .\lyrics.txt `
++  --llm openai `
++  --model gpt-4.1-mini `
++  --option limit=20
++```
++
++Alternatively, supply the key as a command-line argument:
++
++```powershell
++keywordmoves run text-library --operation extract --input .\lyrics.txt --llm openai --openai-api-key "YOUR_OPENAI_API_KEY"
++```
++
++`--openai-api-key` overrides `--option llm_api_key=...` and `OPENAI_API_KEY`.
++Prefer the environment variable: command-line keys may appear in shell history
++or process listings. KeywordMoves does not write the key into result metadata
++or include raw provider error messages in its normal CLI errors.
++
++The default model is `gpt-4.1-mini`; use `--model` to choose another
++Responses-compatible text model available to your API project. The plugin does
++not silently switch providers or models. For a reasoning model, a larger token
++budget may be needed; set `--option llm_max_output_tokens=2048` or higher.
++
++See [docs/openai.md](docs/openai.md) for Bash and Python examples, supported
++options, hosted-data behaviour and troubleshooting.
++
+ ## Write a keyword plugin
+ 
+ Implement an object with a `descriptor` and `run(request, context)` method, then
+@@ -125,6 +168,10 @@ python -m pytest
+ python -m ruff check .
+ ```
+ 
++OpenAI unit/CLI tests also run without the optional SDK. To run the additional
++real-SDK transport tests (using in-memory HTTP responses, not billable API
++calls), install `.[dev,openai]`. CI installs that extra and runs both test sets.
++
+ See [docs/plugin-opportunities.md](docs/plugin-opportunities.md) for researched
+ next-plugin candidates and access constraints.
+ 
+diff --git a/docs/openai.md b/docs/openai.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..e1107699c4af2aff883e874276d8ae50bd4d223c
+--- /dev/null
++++ b/docs/openai.md
+@@ -0,0 +1,202 @@
++# OpenAI LLM plugin
++
++KeywordMoves' `openai` runtime implements the existing
++`generate(LLMRequest) -> LLMResult` interface. Keyword plugins still select their
++runtime through `context.llms.get(name)`: no OpenAI-specific import or provider
++selection is added to `text-library`.
++
++## Installation and selection
++
++From the repository root:
++
++```powershell
++python -m pip install -e ".[openai]"
++keywordmoves plugins --kind llm
++```
++
++The `openai` extra installs the official OpenAI Python SDK (`>=3,<4`). Core
++installs remain dependency-free. Listing plugins and running `extract-local`
++do not import the SDK, require a key, or contact OpenAI. A missing SDK is reported
++only when the runtime is used with otherwise valid configuration.
++
++This runtime uses the Responses API, not Chat Completions, Azure OpenAI or a
++third-party OpenAI-compatible service. The default model is `gpt-4.1-mini`, a
++non-reasoning text model suited to the existing short keyword prompts. A model
++or snapshot can be selected with `--model`; it must support text generation on
++the Responses API and be available to the API project. There is no hard-coded
++model allowlist and no silent fallback after an error.
++
++## API keys
++
++Precedence, highest first:
++
++1. `--openai-api-key KEY` (requires the selected LLM to be `openai`).
++2. `--option llm_api_key=KEY` (the existing generic options mechanism).
++3. The `OPENAI_API_KEY` environment variable.
++
++A blank/invalid explicit key is an error, not permission to fall back to another
++account's environment key. The environment is resolved on each `generate` call.
++Direct Python callers use `LLMRequest.options["api_key"]` for an explicit key;
++otherwise the environment is used. A `.env` file is **not** loaded automatically.
++
++### PowerShell
++
++```powershell
++$env:OPENAI_API_KEY = "YOUR_OPENAI_API_KEY"
++keywordmoves run text-library `
++  --operation extract `
++  --input .\lyrics.txt `
++  --llm openai `
++  --model gpt-4.1-mini `
++  --option limit=20
++```
++
++### Bash / zsh
++
++```bash
++export OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
++keywordmoves run text-library \
++  --operation extract \
++  --input ./lyrics.txt \
++  --llm openai \
++  --model gpt-4.1-mini \
++  --option limit=20
++```
++
++### Command-line key
++
++```powershell
++keywordmoves run text-library --operation extract --input .\lyrics.txt --llm openai --openai-api-key "YOUR_OPENAI_API_KEY"
++```
++
++The environment variable is preferable to putting a key in command arguments.
++Command-line keys can appear in shell history and process listings. Exporting a
++literal key can also put it in shell history: use your environment's secret
++injection or secure prompt facilities for routine use, and never commit keys.
++The plugin does not log keys, copy request options into result metadata, or echo
++raw SDK/provider exceptions. Suppressed exception chaining keeps provider error
++bodies out of normal CLI tracebacks. External debuggers, SDK debug logging,
++process inspection and application logging are outside that guarantee.
++
++## Options
++
++All provider options use the existing `llm_` prefix on the keyword-plugin CLI;
++the prefix is removed in `LLMRequest.options`.
++
++| CLI setting | Default | Meaning |
++| --- | --- | --- |
++| `--model MODEL` | `gpt-4.1-mini` | Model or snapshot; equivalent to `--option llm_model=MODEL`. |
++| `--openai-api-key KEY` | Environment fallback | Explicit key; equivalent generic option is `llm_api_key`. |
++| `--option llm_max_output_tokens=2048` | `LLMRequest.max_new_tokens` (128 in text-library) | Responses output budget; includes reasoning tokens when used. Overrides the request's budget for this runtime. |
++| `--option llm_max_new_tokens=512` | 128 | Existing text-library setting for the request's token budget; used when `llm_max_output_tokens` is absent. |
++| `--option llm_timeout=60` | 60 seconds | Positive, finite SDK network timeout, not a deadline for the whole two-call operation. |
++| `--option llm_max_retries=2` | 2 | Non-negative SDK retry count; `0` disables retries. |
++| `--option llm_temperature=0.2` | Not sent | Finite value from 0 to 2; only use with models supporting this control. |
++| `--option llm_reasoning_effort=low` | Not sent | Passed as `reasoning.effort`; supported values depend on the selected model. |
++| `--option llm_organization=org-...` | SDK environment/default | Optional organization, otherwise the SDK's `OPENAI_ORG_ID` handling applies. |
++| `--option llm_project=proj-...` | SDK environment/default | Optional project, otherwise the SDK's `OPENAI_PROJECT_ID` handling applies. |
++
++Sampling and reasoning controls are not added automatically based on a model's
++name. A non-supporting model produces a configuration error rather than a retry
++with silently changed parameters. The endpoint is explicitly
++`https://api.openai.com/v1`; `OPENAI_BASE_URL` is intentionally not inherited so
++a setting for another application cannot redirect this runtime's credentials.
++Other SDK environment settings, such as project selection and HTTP proxies,
++remain applicable.
++
++For reasoning-capable models, the text-library default of 128 output tokens can
++be too small because reasoning tokens consume the same output budget. Select
++your model and increase `llm_max_output_tokens`; apply `llm_reasoning_effort`
++only when that model supports it. There is no automatic, potentially billable
++retry with a larger budget.
++
++## Python
++
++```python
++from keywordmoves import LLMRegistry, LLMRequest
++
++# Reads OPENAI_API_KEY; pass options={"api_key": key, ...} for an explicit key.
++llm = LLMRegistry().get("openai")
++result = llm.generate(
++    LLMRequest(
++        task="keyword-extraction",
++        prompt="Return only comma-separated search phrases about paper planes at night.",
++        max_new_tokens=256,
++        options={"model": "gpt-4.1-mini", "timeout": 60.0},
++    )
++)
++print(result.text)
++print(result.model)
++print(result.metadata)
++```
++
++Each `generate` call creates and closes its own SDK client, including on API
++errors. The registry does not retain a client containing an earlier call's key.
++The returned model is the model identifier reported by the API; the originally
++requested model is retained as `metadata.requested_model`.
++
++## Hosted data, usage and output
++
++Selecting OpenAI sends the supplied prompt text to OpenAI. It is not a local
++inference mode. The current text-library `extract` operation performs **two**
++model calls: extraction followed by related-concept expansion. Extraction uses
++a text excerpt controlled by `max_text_chars` (currently 2400 by default), plus
++local candidates; expansion sends seed phrases. API charges and provider rate
++limits apply to both calls and to applicable retries.
++
++Requests explicitly set `store=False`. This disables response storage for later
++retrieval through the Responses API; it is not a guarantee of zero retention or
++a replacement for OpenAI's applicable data controls. Do not submit source text
++you are not authorised to send to a hosted provider. Use `extract-local` or the
++Hugging Face runtime for local processing instead.
++
++The runtime returns text, not a provider-specific JSON schema. This preserves
++the existing comma-separated keyword parsing contract. Refusals, incomplete or
++failed responses and empty output raise a clean error; partial text is never
++returned as a successful `LLMResult`. The CLI returns exit code 2 for these
++errors and does not print a partial result.
++
++Metadata is limited to task, API name, requested model, response ID, the storage
++flag and available input/output/total token counts. It excludes credentials,
++request options, prompts and raw provider response/error dumps. These token
++counts describe **one call**, not a price estimate. The current text-library
++result exposes the extraction call's metadata under `llm_metadata`; that is not
++an aggregate of both calls. LLM suggestions remain proposals, not evidence of
++search demand, popularity or ranking potential.
++
++## Troubleshooting
++
++| Symptom | Action |
++| --- | --- |
++| Missing optional SDK | From this checkout, run `python -m pip install -e ".[openai]"`. |
++| Missing key | Set `OPENAI_API_KEY` in the process environment or supply `--openai-api-key` with `--llm openai`. |
++| Authentication failed | Check the key; an explicit key takes precedence over the environment. |
++| Access denied/model unavailable | Check the selected model and the API key's project permissions. |
++| Request rejected | Check model support for Responses, input length and the configured sampling/reasoning controls. |
++| Rate limit/quota | Check API billing and usage limits, reduce request frequency, then retry as appropriate. |
++| Timeout/connection failure | Check networking/TLS/proxies; adjust `llm_timeout` and `llm_max_retries` deliberately. |
++| Output-token limit | Increase `llm_max_output_tokens`, particularly for reasoning models. Partial suggestions are discarded. |
++| Refusal or other incomplete response | Review the supplied task/input; no suggestions from that response are used. |
++
++## Tests and sources
++
++```powershell
++python -m pip install -e ".[dev,openai]"
++python -m pytest
++python -m ruff check .
++```
++
++The unit and CLI tests use a fake SDK and work without OpenAI dependencies.
++`tests/test_openai_sdk.py` also exercises serialization, parsing and error
++mapping through the real SDK and an in-memory HTTPX2 transport. It is skipped
++without the optional SDK; CI installs the extra. Neither suite contacts OpenAI
++or requires a real API key. A live smoke test is a separate, potentially billable
++run using the examples above.
++
++Official references checked for this implementation (2 October 2026):
++
++- [OpenAI Python SDK](https://developers.openai.com/api/reference/python)
++- [Text generation / Responses](https://developers.openai.com/api/docs/guides/text)
++- [Responses API](https://developers.openai.com/api/reference/resources/responses/methods/create)
++- [GPT-4.1 mini](https://developers.openai.com/api/docs/models/gpt-4.1-mini)
++- [Data controls](https://developers.openai.com/api/docs/guides/your-data)
+diff --git a/pyproject.toml b/pyproject.toml
+index f5bdc28933427ddfcc24eff63b085a2d86f9e1df..262113b5c753c556279cf53d68f4dd45733af626 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -24,6 +24,7 @@ classifiers = [
+ dependencies = []
+ 
+ [project.optional-dependencies]
++openai = ["openai>=3,<4"]
+ huggingface = [
+   "torch>=2.4,<3",
+   "transformers>=4.48,<6",
+@@ -45,6 +46,7 @@ google-trends = "keywordmoves.builtin.google_trends:GoogleTrendsPlugin"
+ text-library = "keywordmoves.builtin.text_library:TextLibraryPlugin"
+ 
+ [project.entry-points."keywordmoves.llms"]
++openai = "keywordmoves.builtin.openai_llm:OpenAILLM"
+ huggingface-transformers = "keywordmoves.builtin.huggingface_llm:HuggingFaceTransformersLLM"
+ 
+ [project.urls]
+diff --git a/src/keywordmoves/builtin/openai_llm.py b/src/keywordmoves/builtin/openai_llm.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..f35206852a63e089e396d3b0abc0a6c4ae2ba29f
+--- /dev/null
++++ b/src/keywordmoves/builtin/openai_llm.py
+@@ -0,0 +1,197 @@
++from __future__ import annotations
++
++import math
++import os
++from typing import Any
++
++from ..errors import ConfigurationError, KeywordMovesError
++from ..models import LLMRequest, LLMResult, PluginDescriptor
++
++
++def _text_option(value: Any, name: str) -> str:
++    if not isinstance(value, str) or not value.strip():
++        # Do not interpolate option values: they may be credentials.
++        raise ConfigurationError(f"OpenAI {name} must be a non-empty string.")
++    return value.strip()
++
++
++def _integer_option(value: Any, name: str, minimum: int) -> int:
++    if isinstance(value, bool) or not isinstance(value, (int, str)):
++        raise ConfigurationError(f"OpenAI {name} must be an integer >= {minimum}.")
++    try:
++        number = int(value)
++    except ValueError:
++        raise ConfigurationError(f"OpenAI {name} must be an integer >= {minimum}.") from None
++    if number < minimum:
++        raise ConfigurationError(f"OpenAI {name} must be an integer >= {minimum}.")
++    return number
++
++
++def _number_option(value: Any, name: str) -> float:
++    if isinstance(value, bool) or not isinstance(value, (float, int, str)):
++        raise ConfigurationError(f"OpenAI {name} must be a finite number.")
++    try:
++        number = float(value)
++    except (ValueError, OverflowError):
++        raise ConfigurationError(f"OpenAI {name} must be a finite number.") from None
++    if not math.isfinite(number):
++        raise ConfigurationError(f"OpenAI {name} must be a finite number.")
++    return number
++
++
++class OpenAILLM:
++    """Hosted text generation through the optional official OpenAI Python SDK."""
++
++    descriptor = PluginDescriptor(
++        name="openai",
++        summary="Generate text with OpenAI's hosted models through the Responses API.",
++        capabilities=("generate", "remote-inference"),
++        operations=("generate",),
++    )
++    default_model = "gpt-4.1-mini"
++
++    def generate(self, request: LLMRequest) -> LLMResult:
++        options = request.options
++        # An explicitly supplied key wins, even when invalid; never fall back to
++        # another account silently. Resolve the environment at call time.
++        key = options.get("api_key") if "api_key" in options else os.environ.get("OPENAI_API_KEY")
++        if key is None:
++            raise ConfigurationError(
++                "The OpenAI LLM plugin requires an API key. Set OPENAI_API_KEY or pass "
++                "--openai-api-key with --llm openai."
++            )
++        api_key = _text_option(key, "API key")
++        model = _text_option(options.get("model", self.default_model), "model")
++        max_output_tokens = _integer_option(
++            options.get("max_output_tokens", request.max_new_tokens), "max_output_tokens", 16
++        )
++        timeout = _number_option(options.get("timeout", 60.0), "timeout")
++        if timeout <= 0:
++            raise ConfigurationError("OpenAI timeout must be greater than zero.")
++        max_retries = _integer_option(options.get("max_retries", 2), "max_retries", 0)
++        if not isinstance(request.prompt, str) or not request.prompt.strip():
++            raise ConfigurationError("OpenAI prompt must be a non-empty string.")
++
++        client_options: dict[str, Any] = {
++            "api_key": api_key,
++            # Do not accidentally send this key to an inherited OPENAI_BASE_URL.
++            "base_url": "https://api.openai.com/v1",
++            "timeout": timeout,
++            "max_retries": max_retries,
++        }
++        for name in ("organization", "project"):
++            if name in options:
++                client_options[name] = _text_option(options[name], name)
++        parameters: dict[str, Any] = {
++            "model": model,
++            "input": request.prompt,
++            "max_output_tokens": max_output_tokens,
++            "store": False,
++        }
++        # Omit sampling/reasoning controls unless explicitly requested. Different
++        # model families accept different controls; do not guess from the name.
++        if "temperature" in options:
++            temperature = _number_option(options["temperature"], "temperature")
++            if not 0 <= temperature <= 2:
++                raise ConfigurationError("OpenAI temperature must be between 0 and 2.")
++            parameters["temperature"] = temperature
++        if "reasoning_effort" in options:
++            parameters["reasoning"] = {
++                "effort": _text_option(options["reasoning_effort"], "reasoning_effort")
++            }
++
++        try:
++            import openai
++        except ImportError:
++            raise ConfigurationError(
++                "The OpenAI LLM plugin needs the optional SDK. "
++                "Install it with: pip install 'keywordmoves[openai]'. "
++                'From a checkout use: python -m pip install -e ".[openai]".'
++            ) from None
++
++        # A short-lived client avoids caching secrets or reusing a different
++        # account's client. The context manager closes connections on errors too.
++        try:
++            with openai.OpenAI(**client_options) as client:
++                response = client.responses.create(**parameters)
++        except openai.AuthenticationError:
++            raise ConfigurationError(
++                "OpenAI authentication failed. Check OPENAI_API_KEY or --openai-api-key."
++            ) from None
++        except openai.PermissionDeniedError:
++            raise ConfigurationError(
++                "OpenAI denied access. Check the API key's project and model permissions."
++            ) from None
++        except openai.NotFoundError:
++            raise ConfigurationError(
++                "The OpenAI model was not found or is unavailable to this project. Check --model."
++            ) from None
++        except (openai.BadRequestError, openai.UnprocessableEntityError):
++            raise ConfigurationError(
++                "OpenAI rejected the request. Check --model, input length and llm_ options. "
++                "The model must support text generation through the Responses API; "
++                "temperature and reasoning_effort are model-dependent."
++            ) from None
++        except openai.RateLimitError:
++            raise KeywordMovesError(
++                "OpenAI rate limit or quota exceeded. Check API billing/limits and retry later."
++            ) from None
++        except openai.APITimeoutError:
++            raise KeywordMovesError(
++                "The OpenAI request timed out. Retry or increase --option llm_timeout=120."
++            ) from None
++        except openai.APIConnectionError:
++            raise KeywordMovesError(
++                "Could not connect to OpenAI. Check the network, proxy and TLS configuration."
++            ) from None
++        except openai.APIError:
++            # Provider messages/bodies can echo credentials or private input.
++            # Do not print them or chain their traceback into public errors.
++            raise KeywordMovesError(
++                "The OpenAI API request failed. Retry later or check the API service status."
++            ) from None
++
++        return self._result(response, request, model)
++
++    def _result(self, response: Any, request: LLMRequest, model: str) -> LLMResult:
++        for item in getattr(response, "output", None) or ():
++            for part in getattr(item, "content", None) or ():
++                if getattr(part, "type", None) == "refusal":
++                    raise KeywordMovesError("OpenAI refused the request; no suggestions were returned.")
++        status = getattr(response, "status", None)
++        if status == "incomplete":
++            reason = getattr(getattr(response, "incomplete_details", None), "reason", None)
++            if reason == "max_output_tokens":
++                raise KeywordMovesError(
++                    "OpenAI reached the output-token limit; partial suggestions were discarded. "
++                    "Increase --option llm_max_output_tokens=2048 (reasoning tokens also count)."
++                )
++            raise KeywordMovesError("OpenAI returned an incomplete response; no suggestions were used.")
++        if status != "completed":
++            raise KeywordMovesError("OpenAI did not complete the response; no suggestions were used.")
++        text = getattr(response, "output_text", None)
++        if not isinstance(text, str) or not text.strip():
++            raise KeywordMovesError("OpenAI returned no text; no suggestions were used.")
++
++        # Only explicitly selected, non-secret fields enter result metadata.
++        metadata: dict[str, Any] = {
++            "task": request.task,
++            "api": "responses",
++            "requested_model": model,
++            "response_id": getattr(response, "id", None),
++            "store": False,
++        }
++        usage = getattr(response, "usage", None)
++        if usage is not None:
++            metadata["usage"] = {
++                name: value
++                for name in ("input_tokens", "output_tokens", "total_tokens")
++                if isinstance(value := getattr(usage, name, None), int)
++                and not isinstance(value, bool)
++            }
++        return LLMResult(
++            plugin=self.descriptor.name,
++            model=getattr(response, "model", None) or model,
++            text=text.strip(),
++            metadata=metadata,
++        )
+diff --git a/src/keywordmoves/cli.py b/src/keywordmoves/cli.py
+index ea342ff8bb9c332c40b1cd7e0110729dc7f0060c..1f8552956b964246381c16e2124eb59813662a3b 100644
+--- a/src/keywordmoves/cli.py
++++ b/src/keywordmoves/cli.py
+@@ -6,7 +6,7 @@ import sys
+ from pathlib import Path
+ from typing import Any, Sequence
+ 
+-from .errors import KeywordMovesError
++from .errors import ConfigurationError, KeywordMovesError
+ from .models import ExecutionContext, PluginRequest
+ from .registry import LLMRegistry, PluginRegistry
+ 
+@@ -50,6 +50,12 @@ def build_parser() -> argparse.ArgumentParser:
+     run.add_argument("--input", action="append", type=Path, default=[])
+     run.add_argument("--llm", help="Select an LLM plugin for LLM-backed operations.")
+     run.add_argument("--model", help="Select the model within the chosen LLM plugin.")
++    run.add_argument(
++        "--openai-api-key",
++        metavar="KEY",
++        help="OpenAI API key (overrides OPENAI_API_KEY; requires --llm openai). "
++        "Prefer the environment to avoid exposing keys in shell history or process arguments.",
++    )
+     run.add_argument("--option", action="append", type=_option, default=[])
+     run.add_argument("--format", choices=("json", "text"), default="json")
+     return parser
+@@ -98,6 +104,10 @@ def main(argv: Sequence[str] | None = None) -> int:
+             options["llm"] = args.llm
+         if args.model:
+             options["llm_model"] = args.model
++        if args.openai_api_key is not None:
++            if options.get("llm") != "openai":
++                raise ConfigurationError("--openai-api-key requires --llm openai.")
++            options["llm_api_key"] = args.openai_api_key
+         plugin = keyword_plugins.get(args.plugin)
+         result = plugin.run(
+             PluginRequest(
+diff --git a/src/keywordmoves/registry.py b/src/keywordmoves/registry.py
+index 1c8c1e122fe268a7ab973eec5c12fcd2f5b9dcdc..ad4e5a1e214db83fcc554b25656d3c7c1b41aa0d 100644
+--- a/src/keywordmoves/registry.py
++++ b/src/keywordmoves/registry.py
+@@ -57,8 +57,12 @@ def _keyword_builtins() -> dict[str, Callable[[], Any]]:
+ 
+ def _llm_builtins() -> dict[str, Callable[[], Any]]:
+     from .builtin.huggingface_llm import HuggingFaceTransformersLLM
++    from .builtin.openai_llm import OpenAILLM
+ 
+-    return {"huggingface-transformers": HuggingFaceTransformersLLM}
++    return {
++        "huggingface-transformers": HuggingFaceTransformersLLM,
++        "openai": OpenAILLM,
++    }
+ 
+ 
+ class PluginRegistry(_Registry[Any]):
+diff --git a/tests/test_openai_llm.py b/tests/test_openai_llm.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..2ade547fdab065ec218c283e1221620afcd3f2c4
+--- /dev/null
++++ b/tests/test_openai_llm.py
+@@ -0,0 +1,372 @@
++import builtins
++import json
++import sys
++import traceback
++from pathlib import Path
++from types import ModuleType, SimpleNamespace
++from unittest.mock import MagicMock, Mock
++
++import pytest
++
++from keywordmoves.builtin.openai_llm import OpenAILLM
++from keywordmoves.cli import main
++from keywordmoves.errors import ConfigurationError, KeywordMovesError
++from keywordmoves.models import LLMRequest
++from keywordmoves.registry import LLMRegistry
++
++FIXTURE = Path(__file__).parent / "fixtures" / "lyrics.txt"
++
++
++@pytest.fixture
++def sdk(monkeypatch):
++    """No SDK installation, network connection or genuine key is required."""
++    module = ModuleType("openai")
++    for name, parent in (
++        ("APIError", Exception),
++        ("APIStatusError", "APIError"),
++        ("AuthenticationError", "APIStatusError"),
++        ("PermissionDeniedError", "APIStatusError"),
++        ("NotFoundError", "APIStatusError"),
++        ("BadRequestError", "APIStatusError"),
++        ("UnprocessableEntityError", "APIStatusError"),
++        ("RateLimitError", "APIStatusError"),
++        ("APIConnectionError", "APIError"),
++        ("APITimeoutError", "APIConnectionError"),
++    ):
++        base = getattr(module, parent) if isinstance(parent, str) else parent
++        setattr(module, name, type(name, (base,), {}))
++    response = SimpleNamespace(
++        id="resp-test",
++        model="gpt-4.1-mini-2025-04-14",
++        status="completed",
++        output=[],
++        output_text="  paper planes, midnight sky  ",
++        usage=SimpleNamespace(input_tokens=20, output_tokens=8, total_tokens=28),
++        incomplete_details=None,
++    )
++    client = SimpleNamespace(responses=SimpleNamespace(create=Mock(return_value=response)))
++    context = MagicMock()
++    context.__enter__.return_value = client
++    context.__exit__.return_value = False
++    module.OpenAI = Mock(return_value=context)
++    monkeypatch.setitem(sys.modules, "openai", module)
++    monkeypatch.setenv("OPENAI_API_KEY", "sk-env-test-not-a-real-key")
++    return SimpleNamespace(module=module, client=client, context=context, response=response)
++
++
++def generate(**options):
++    return OpenAILLM().generate(
++        LLMRequest(task="keyword-extraction", prompt="Return search phrases.", options=options)
++    )
++
++
++def test_defaults_map_to_responses_and_record_safe_metadata(sdk):
++    result = generate()
++    sdk.module.OpenAI.assert_called_once_with(
++        api_key="sk-env-test-not-a-real-key",
++        base_url="https://api.openai.com/v1",
++        timeout=60.0,
++        max_retries=2,
++    )
++    sdk.client.responses.create.assert_called_once_with(
++        model="gpt-4.1-mini",
++        input="Return search phrases.",
++        max_output_tokens=128,
++        store=False,
++    )
++    assert result.plugin == "openai"
++    assert result.model == "gpt-4.1-mini-2025-04-14"
++    assert result.text == "paper planes, midnight sky"
++    assert result.metadata == {
++        "task": "keyword-extraction",
++        "api": "responses",
++        "requested_model": "gpt-4.1-mini",
++        "response_id": "resp-test",
++        "store": False,
++        "usage": {"input_tokens": 20, "output_tokens": 8, "total_tokens": 28},
++    }
++    sdk.context.__exit__.assert_called_once()
++
++
++def test_explicit_key_overrides_environment(sdk):
++    generate(api_key="  sk-explicit-test  ")
++    assert sdk.module.OpenAI.call_args.kwargs["api_key"] == "sk-explicit-test"
++
++
++def test_key_and_model_are_resolved_per_call(sdk, monkeypatch):
++    llm = OpenAILLM()
++    request = LLMRequest(task="test", prompt="A prompt.")
++    llm.generate(request)
++    monkeypatch.setenv("OPENAI_API_KEY", "sk-rotated-test")
++    llm.generate(request)
++    assert sdk.module.OpenAI.call_count == 2
++    assert sdk.module.OpenAI.call_args.kwargs["api_key"] == "sk-rotated-test"
++
++
++def test_client_and_generation_controls_are_separated(sdk):
++    generate(
++        model="a-future-text-model",
++        api_key="sk-explicit-test",
++        organization="org-test",
++        project="proj-test",
++        timeout="12.5",
++        max_retries="0",
++        max_output_tokens="2048",
++        temperature="0.25",
++        reasoning_effort="low",
++        unused_provider_option="must-not-be-forwarded",
++    )
++    assert sdk.module.OpenAI.call_args.kwargs == {
++        "api_key": "sk-explicit-test",
++        "base_url": "https://api.openai.com/v1",
++        "timeout": 12.5,
++        "max_retries": 0,
++        "organization": "org-test",
++        "project": "proj-test",
++    }
++    assert sdk.client.responses.create.call_args.kwargs == {
++        "model": "a-future-text-model",
++        "input": "Return search phrases.",
++        "max_output_tokens": 2048,
++        "store": False,
++        "temperature": 0.25,
++        "reasoning": {"effort": "low"},
++    }
++
++
++def test_inherited_base_url_cannot_redirect_api_key(sdk, monkeypatch):
++    monkeypatch.setenv("OPENAI_BASE_URL", "https://example.invalid/v1")
++    generate()
++    assert sdk.module.OpenAI.call_args.kwargs["base_url"] == "https://api.openai.com/v1"
++
++
++def test_request_token_budget_is_used_without_an_override(sdk):
++    OpenAILLM().generate(LLMRequest(task="test", prompt="Prompt", max_new_tokens=512))
++    assert sdk.client.responses.create.call_args.kwargs["max_output_tokens"] == 512
++
++
++def test_model_specific_controls_are_not_assumed(sdk):
++    generate(model="a-reasoning-model")
++    params = sdk.client.responses.create.call_args.kwargs
++    assert "temperature" not in params
++    assert "reasoning" not in params
++
++
++@pytest.mark.parametrize(
++    "options",
++    [
++        {"api_key": None},
++        {"api_key": ""},
++        {"api_key": " \t "},
++        {"api_key": 123},
++        {"model": ""},
++        {"model": False},
++        {"max_output_tokens": 0},
++        {"max_output_tokens": -1},
++        {"max_output_tokens": True},
++        {"max_output_tokens": 16.5},
++        {"max_output_tokens": "16.5"},
++        {"timeout": 0},
++        {"timeout": -1},
++        {"timeout": True},
++        {"timeout": "not-a-number"},
++        {"timeout": float("nan")},
++        {"timeout": float("inf")},
++        {"max_retries": -1},
++        {"max_retries": 2.5},
++        {"max_retries": "bad"},
++        {"max_retries": True},
++        {"temperature": -0.1},
++        {"temperature": 2.1},
++        {"temperature": float("nan")},
++        {"temperature": {}},
++        {"reasoning_effort": ""},
++        {"organization": None},
++        {"project": ""},
++    ],
++)
++def test_invalid_options_fail_before_creating_a_client(sdk, options):
++    with pytest.raises(ConfigurationError):
++        generate(**options)
++    sdk.module.OpenAI.assert_not_called()
++
++
++def test_blank_prompt_is_rejected(sdk):
++    with pytest.raises(ConfigurationError, match="prompt"):
++        OpenAILLM().generate(LLMRequest(task="test", prompt="  "))
++    sdk.module.OpenAI.assert_not_called()
++
++
++def test_missing_key_gives_an_actionable_error(sdk, monkeypatch):
++    monkeypatch.delenv("OPENAI_API_KEY")
++    with pytest.raises(ConfigurationError, match="OPENAI_API_KEY"):
++        generate()
++    sdk.module.OpenAI.assert_not_called()
++
++
++def test_missing_sdk_gives_install_instructions(sdk, monkeypatch):
++    monkeypatch.setitem(sys.modules, "openai", None)
++    with pytest.raises(ConfigurationError, match=r"keywordmoves\[openai\]"):
++        generate()
++
++
++@pytest.mark.parametrize(
++    ("name", "expected_type", "message"),
++    [
++        ("AuthenticationError", ConfigurationError, "authentication failed"),
++        ("PermissionDeniedError", ConfigurationError, "denied access"),
++        ("NotFoundError", ConfigurationError, "model was not found"),
++        ("BadRequestError", ConfigurationError, "rejected the request"),
++        ("UnprocessableEntityError", ConfigurationError, "rejected the request"),
++        ("RateLimitError", KeywordMovesError, "rate limit or quota"),
++        ("APITimeoutError", KeywordMovesError, "timed out"),
++        ("APIConnectionError", KeywordMovesError, "Could not connect"),
++        ("APIStatusError", KeywordMovesError, "API request failed"),
++        ("APIError", KeywordMovesError, "API request failed"),
++    ],
++)
++def test_sdk_errors_are_clean_and_do_not_echo_provider_details(sdk, name, expected_type, message):
++    secret = "sk-error-test-credential"
++    sdk.client.responses.create.side_effect = getattr(sdk.module, name)(
++        f"The provider echoed {secret} and private source text"
++    )
++    with pytest.raises(expected_type, match=message) as caught:
++        generate(api_key=secret)
++    rendered = "".join(traceback.format_exception(caught.value))
++    assert secret not in rendered
++    assert "private source text" not in rendered
++    sdk.context.__exit__.assert_called_once()
++
++
++def test_refusal_is_not_parsed_as_a_keyword(sdk):
++    sdk.response.output = [
++        SimpleNamespace(type="reasoning"),
++        SimpleNamespace(content=[SimpleNamespace(type="refusal", refusal="private refusal")]),
++    ]
++    with pytest.raises(KeywordMovesError, match="refused") as caught:
++        generate()
++    assert "private refusal" not in str(caught.value)
++
++
++def test_output_limit_discards_partial_text(sdk):
++    sdk.response.status = "incomplete"
++    sdk.response.incomplete_details = SimpleNamespace(reason="max_output_tokens")
++    with pytest.raises(KeywordMovesError, match="llm_max_output_tokens"):
++        generate()
++
++
++def test_other_incomplete_response_discards_partial_text(sdk):
++    sdk.response.status = "incomplete"
++    sdk.response.incomplete_details = SimpleNamespace(reason="content_filter")
++    with pytest.raises(KeywordMovesError, match="incomplete"):
++        generate()
++
++
++@pytest.mark.parametrize("status", ["failed", "cancelled", "queued", "in_progress", None])
++def test_non_completed_responses_are_rejected(sdk, status):
++    sdk.response.status = status
++    with pytest.raises(KeywordMovesError, match="did not complete"):
++        generate()
++
++
++@pytest.mark.parametrize("text", ["", " \n ", None])
++def test_empty_text_is_rejected(sdk, text):
++    sdk.response.output_text = text
++    with pytest.raises(KeywordMovesError, match="no text"):
++        generate()
++
++
++def test_missing_usage_and_model_are_handled(sdk):
++    sdk.response.usage = None
++    sdk.response.model = None
++    result = generate()
++    assert "usage" not in result.metadata
++    assert result.model == "gpt-4.1-mini"
++
++
++def test_usage_metadata_is_allowlisted(sdk):
++    sdk.response.usage.secret = "sk-must-not-be-copied"
++    sdk.response.usage.input_tokens = None
++    sdk.response.usage.output_tokens = True
++    result = generate()
++    assert result.metadata["usage"] == {"total_tokens": 28}
++    assert "sk-must-not-be-copied" not in json.dumps(result.metadata)
++
++
++def test_discovery_and_local_extraction_do_not_import_sdk(monkeypatch, capsys):
++    original_import = builtins.__import__
++
++    def no_sdk(name, *args, **kwargs):
++        if name == "openai" or name.startswith("openai."):
++            raise AssertionError("Core/local operations must not import the OpenAI SDK")
++        return original_import(name, *args, **kwargs)
++
++    monkeypatch.setattr(builtins, "__import__", no_sdk)
++    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
++    assert "openai" in LLMRegistry().names()
++    assert main(["plugins", "--kind", "llm", "--json"]) == 0
++    listing = json.loads(capsys.readouterr().out)
++    assert {item["name"] for item in listing} == {"huggingface-transformers", "openai"}
++    assert main([
++        "run", "text-library", "--operation", "extract-local", "--input", str(FIXTURE),
++    ]) == 0
++    assert json.loads(capsys.readouterr().out)["operation"] == "extract-local"
++
++
++@pytest.mark.parametrize("key_source", ["environment", "flag", "option", "flag-over-option"])
++def test_cli_runs_both_text_library_calls(sdk, capsys, key_source):
++    args = [
++        "run", "text-library", "--operation", "extract", "--input", str(FIXTURE),
++        "--llm", "openai", "--model", "gpt-4.1-mini", "--option", "limit=20",
++        "--option", "llm_max_output_tokens=512",
++    ]
++    key = "sk-env-test-not-a-real-key"
++    if key_source in {"option", "flag-over-option"}:
++        args += ["--option", "llm_api_key=sk-option-test"]
++        key = "sk-option-test"
++    if key_source in {"flag", "flag-over-option"}:
++        args += ["--openai-api-key", "sk-flag-test"]
++        key = "sk-flag-test"
++    related = SimpleNamespace(**vars(sdk.response))
++    related.output_text = "flight path, city at night"
++    sdk.client.responses.create.side_effect = [sdk.response, related]
++    assert main(args) == 0
++    captured = capsys.readouterr()
++    result = json.loads(captured.out)
++    assert result["metadata"]["llm_plugin"] == "openai"
++    assert any(k["phrase"] == "flight path" for k in result["keywords"])
++    assert any(k["relationship"] == "llm-related" for k in result["keywords"])
++    assert sdk.client.responses.create.call_count == 2
++    for call in sdk.module.OpenAI.call_args_list:
++        assert call.kwargs["api_key"] == key
++    for call in sdk.client.responses.create.call_args_list:
++        assert call.kwargs["max_output_tokens"] == 512
++        assert "api_key" not in call.kwargs
++    assert "Extract up to" in sdk.client.responses.create.call_args_list[0].kwargs["input"]
++    assert "Suggest up to" in sdk.client.responses.create.call_args_list[1].kwargs["input"]
++    assert key not in captured.out + captured.err
++
++
++@pytest.mark.parametrize("llm_args", [[], ["--llm", "huggingface-transformers"]])
++def test_key_flag_requires_openai_selection(sdk, capsys, llm_args):
++    assert main([
++        "run", "text-library", "--operation", "extract", "--input", str(FIXTURE),
++        "--openai-api-key", "sk-cli-test", *llm_args,
++    ]) == 2
++    captured = capsys.readouterr()
++    assert "requires --llm openai" in captured.err
++    assert "sk-cli-test" not in captured.err
++    sdk.module.OpenAI.assert_not_called()
++
++
++def test_cli_auth_error_returns_two_without_key_or_traceback(sdk, capsys):
++    sdk.client.responses.create.side_effect = sdk.module.AuthenticationError("sk-echoed-test")
++    assert main([
++        "run", "text-library", "--operation", "extract", "--input", str(FIXTURE),
++        "--llm", "openai", "--openai-api-key", "sk-echoed-test",
++    ]) == 2
++    captured = capsys.readouterr()
++    assert "authentication failed" in captured.err
++    assert "sk-echoed-test" not in captured.err
++    assert "Traceback" not in captured.err
++    assert not captured.out
+diff --git a/tests/test_openai_sdk.py b/tests/test_openai_sdk.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..8d01a6b1005f880922bb6a8ea3ece080b4784b61
+--- /dev/null
++++ b/tests/test_openai_sdk.py
+@@ -0,0 +1,96 @@
++"""Exercise the real optional SDK against an in-memory HTTP transport, never OpenAI."""
++
++import json
++
++import pytest
++
++from keywordmoves.builtin.openai_llm import OpenAILLM
++from keywordmoves.errors import ConfigurationError
++from keywordmoves.models import LLMRequest
++
++openai = pytest.importorskip("openai", reason="Install keywordmoves[openai] for SDK transport tests")
++
++
++def install_transport(monkeypatch, handler):
++    # HTTPX2 is the HTTP transport used by the supported OpenAI 3.x SDK.
++    import httpx2
++
++    constructor = openai.OpenAI
++    clients = []
++
++    def make_client(**kwargs):
++        http_client = httpx2.Client(transport=httpx2.MockTransport(handler), trust_env=False)
++        clients.append(http_client)
++        return constructor(http_client=http_client, **kwargs)
++
++    monkeypatch.setattr(openai, "OpenAI", make_client)
++    return clients
++
++
++def test_real_sdk_serializes_request_and_parses_response(monkeypatch):
++    import httpx2
++
++    seen = []
++
++    def respond(request):
++        seen.append(request)
++        return httpx2.Response(200, json={
++            "id": "resp-transport-test",
++            "object": "response",
++            "created_at": 0,
++            "status": "completed",
++            "model": "gpt-4.1-mini-2025-04-14",
++            "output": [{
++                "id": "msg-transport-test",
++                "type": "message",
++                "role": "assistant",
++                "status": "completed",
++                "content": [{
++                    "type": "output_text", "text": "paper planes, midnight sky", "annotations": [],
++                }],
++            }],
++            "usage": {
++                "input_tokens": 20, "output_tokens": 8, "total_tokens": 28,
++                "input_tokens_details": {"cached_tokens": 0},
++                "output_tokens_details": {"reasoning_tokens": 0},
++            },
++        })
++
++    clients = install_transport(monkeypatch, respond)
++    result = OpenAILLM().generate(LLMRequest(
++        task="test", prompt="Find keywords.", max_new_tokens=256,
++        options={"api_key": "sk-sdk-transport-test", "max_retries": 0},
++    ))
++    assert len(seen) == 1
++    assert str(seen[0].url) == "https://api.openai.com/v1/responses"
++    assert seen[0].headers["authorization"] == "Bearer sk-sdk-transport-test"
++    assert seen[0].method == "POST"
++    assert json.loads(seen[0].content) == {
++        "model": "gpt-4.1-mini", "input": "Find keywords.",
++        "max_output_tokens": 256, "store": False,
++    }
++    assert result.text == "paper planes, midnight sky"
++    assert result.metadata["usage"]["total_tokens"] == 28
++    assert all(client.is_closed for client in clients)
++
++
++def test_real_sdk_authentication_error_is_sanitized(monkeypatch):
++    import httpx2
++
++    def respond(request):
++        return httpx2.Response(401, json={
++            "error": {
++                "message": "Incorrect API key: sk-sdk-transport-test",
++                "type": "invalid_request_error",
++                "code": "invalid_api_key",
++            },
++        })
++
++    clients = install_transport(monkeypatch, respond)
++    with pytest.raises(ConfigurationError, match="authentication failed") as caught:
++        OpenAILLM().generate(LLMRequest(
++            task="test", prompt="Find keywords.",
++            options={"api_key": "sk-sdk-transport-test", "max_retries": 0},
++        ))
++    assert "sk-sdk-transport-test" not in str(caught.value)
++    assert all(client.is_closed for client in clients)
+diff --git a/tests/test_registry.py b/tests/test_registry.py
+index 456306f6c3acc48972d779c4e35ed20bd9e0be06..9399d4d84827a7ee62a7b95278c27577247f864e 100644
+--- a/tests/test_registry.py
++++ b/tests/test_registry.py
+@@ -6,7 +6,7 @@ def test_builtin_keyword_plugins_are_discoverable():
+ 
+ 
+ def test_builtin_llm_plugin_is_discoverable():
+-    assert LLMRegistry().names() == ("huggingface-transformers",)
++    assert LLMRegistry().names() == ("huggingface-transformers", "openai")
+ 
+ 
+ def test_registry_caches_instances():
