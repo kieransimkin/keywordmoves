@@ -250,6 +250,40 @@ budget may be needed; set `--option llm_max_output_tokens=2048` or higher.
 See [docs/openai.md](docs/openai.md) for Bash and Python examples, supported
 options, hosted-data behaviour and troubleshooting.
 
+## Online keyword sources
+
+Install the optional networking and HTML parsers:
+
+```powershell
+python -m pip install -e ".[online]"
+keywordmoves plugins --kind keyword
+```
+
+The online suite adds twelve documented API adapters: `google-ads`,
+`search-console`, `dataforseo`, `semrush`, `ahrefs`, `keywordtool`,
+`keywords-everywhere`, `alsoasked`, `serpapi`, `brave-suggest`, `datamuse` and
+`wikipedia`. It also includes three explicitly opt-in experimental browser
+suggestion endpoints, a configurable `website-keywords` public-HTML extractor,
+and **import-only** `ubersuggest` and `answerthepublic` adapters.
+
+```powershell
+keywordmoves run datamuse --operation related --keyword "independent music" --option limit=20
+
+$env:SEMRUSH_API_KEY = "YOUR_SEMRUSH_KEY"
+keywordmoves run semrush --operation related --keyword "independent music" --option database=uk
+```
+
+Online sources use `--keyword` seeds, not reference-text inputs or LLM flags.
+API credentials come from provider-specific environment variables or explicit
+`--option` settings. Most commercial APIs require separate API access and may
+charge credits. A local output limit is not a universal billing cap.
+
+See [the online-source guide and research matrix](docs/online-sources.md) for
+all eighteen plugins, exact operations, credentials, locale conventions,
+website query/extraction rules, access limitations and primary-source links.
+The guide distinguishes API adapters from experimental endpoints and report
+imports: no authenticated production access is implied by offline tests.
+
 ## Write a keyword plugin
 
 Implement an object with a `descriptor` and `run(request, context)` method, then

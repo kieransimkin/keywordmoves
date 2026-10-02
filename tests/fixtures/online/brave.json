@@ -1,0 +1,11 @@
+{
+  "type": "suggest",
+  "query": {
+    "original": "paper"
+  },
+  "results": [
+    {
+      "query": "paper planes"
+    }
+  ]
+}

@@ -24,6 +24,7 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
+online = ["httpx>=0.27,<1", "beautifulsoup4>=4.12,<5"]
 keybert = [
   "keybert>=0.9,<1",
   "sentence-transformers>=3.4,<6",
@@ -49,6 +50,24 @@ dev = [
 keywordmoves = "keywordmoves.cli:main"
 
 [project.entry-points."keywordmoves.plugins"]
+ahrefs = "keywordmoves.online.commercial:AhrefsPlugin"
+alsoasked = "keywordmoves.online.discovery:AlsoAskedPlugin"
+answerthepublic = "keywordmoves.online.websites:AnswerThePublicPlugin"
+bing-autocomplete = "keywordmoves.online.websites:BingAutocompletePlugin"
+brave-suggest = "keywordmoves.online.discovery:BraveSuggestPlugin"
+dataforseo = "keywordmoves.online.commercial:DataForSEOPlugin"
+datamuse = "keywordmoves.online.discovery:DatamusePlugin"
+duckduckgo-autocomplete = "keywordmoves.online.websites:DuckDuckGoAutocompletePlugin"
+google-ads = "keywordmoves.online.google:GoogleAdsPlugin"
+google-autocomplete = "keywordmoves.online.websites:GoogleAutocompletePlugin"
+keywords-everywhere = "keywordmoves.online.commercial:KeywordsEverywherePlugin"
+keywordtool = "keywordmoves.online.commercial:KeywordToolPlugin"
+search-console = "keywordmoves.online.google:SearchConsolePlugin"
+semrush = "keywordmoves.online.commercial:SemrushPlugin"
+serpapi = "keywordmoves.online.discovery:SerpAPIPlugin"
+ubersuggest = "keywordmoves.online.websites:UbersuggestPlugin"
+website-keywords = "keywordmoves.online.websites:WebsiteKeywordsPlugin"
+wikipedia = "keywordmoves.online.discovery:WikipediaPlugin"
 keybert = "keywordmoves.builtin.keybert_keywords:KeyBERTKeywordPlugin"
 nltk = "keywordmoves.builtin.nltk_keywords:NLTKKeywordPlugin"
 google-trends = "keywordmoves.builtin.google_trends:GoogleTrendsPlugin"

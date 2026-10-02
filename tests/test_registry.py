@@ -1,8 +1,10 @@
+from keywordmoves.online import factories as online_factories
 from keywordmoves.registry import LLMRegistry, PluginRegistry
 
 
 def test_builtin_keyword_plugins_are_discoverable():
-    assert PluginRegistry().names() == ("google-trends", "keybert", "nltk", "observed-evidence", "spacy", "text-library")
+    expected = {"google-trends", "keybert", "nltk", "observed-evidence", "spacy", "text-library"}
+    assert set(PluginRegistry().names()) == expected | set(online_factories())
 
 
 def test_builtin_llm_plugin_is_discoverable():

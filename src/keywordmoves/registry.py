@@ -52,6 +52,7 @@ def _keyword_builtins() -> dict[str, Callable[[], Any]]:
     from .builtin.observed_evidence import ObservedEvidencePlugin
     from .builtin.spacy_keywords import SpacyKeywordPlugin
     from .builtin.text_library import TextLibraryPlugin
+    from .online import factories as online_factories
 
     return {
         "google-trends": GoogleTrendsPlugin,
@@ -60,6 +61,7 @@ def _keyword_builtins() -> dict[str, Callable[[], Any]]:
         "observed-evidence": ObservedEvidencePlugin,
         "spacy": SpacyKeywordPlugin,
         "text-library": TextLibraryPlugin,
+        **online_factories(),
     }
 
 

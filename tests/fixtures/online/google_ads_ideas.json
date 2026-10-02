@@ -1,0 +1,21 @@
+{
+  "results": [
+    {
+      "text": "paper planes",
+      "keywordIdeaMetrics": {
+        "avgMonthlySearches": "0",
+        "competition": "LOW",
+        "competitionIndex": "12",
+        "lowTopOfPageBidMicros": "123000",
+        "highTopOfPageBidMicros": null,
+        "monthlySearchVolumes": [
+          {
+            "year": "2026",
+            "month": "AUGUST",
+            "monthlySearches": "20"
+          }
+        ]
+      }
+    }
+  ]
+}

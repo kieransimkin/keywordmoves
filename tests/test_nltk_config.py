@@ -150,6 +150,6 @@ raise SystemExit(main(["plugins", "--json"]))
                             env={**os.environ, "PYTHONPATH": str(root / "src")},
                             text=True, capture_output=True, check=True)
     items = json.loads(result.stdout)
-    assert {item["name"] for item in items if item["kind"] == "keyword"} == {
+    assert {item["name"] for item in items if item["kind"] == "keyword"} >= {
         "google-trends", "keybert", "observed-evidence", "nltk", "spacy", "text-library",
     }

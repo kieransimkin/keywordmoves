@@ -1,0 +1,3029 @@
+diff --git a/.github/workflows/online-tests.yml b/.github/workflows/online-tests.yml
+new file mode 100644
+index 0000000000000000000000000000000000000000..2277de53e8db326fb9ecc7d1c30aad5b3876f846
+--- /dev/null
++++ b/.github/workflows/online-tests.yml
+@@ -0,0 +1,27 @@
++name: online-source-contracts
++
++on:
++  push:
++    branches: [main]
++  pull_request:
++
++permissions:
++  contents: read
++
++jobs:
++  online:
++    strategy:
++      fail-fast: false
++      matrix:
++        os: [ubuntu-latest, windows-latest]
++        python-version: ["3.10", "3.11", "3.12", "3.13"]
++    runs-on: ${{ matrix.os }}
++    steps:
++      - uses: actions/checkout@v5
++      - uses: actions/setup-python@v6
++        with:
++          python-version: ${{ matrix.python-version }}
++          cache: pip
++      - run: python -m pip install -e ".[dev,online]"
++      - run: python -m ruff check .
++      - run: python -m pytest tests/test_online_api.py tests/test_online_transport.py tests/test_online_websites.py tests/test_registry.py --cov=keywordmoves.online --cov-report=term-missing
+diff --git a/MANIFEST.in b/MANIFEST.in
+index d94ff3c5e5a619ffde1080a196c38cd778fb9937..1a88c01cdbeff50cfbad19b4b41391d56665780d 100644
+--- a/MANIFEST.in
++++ b/MANIFEST.in
+@@ -2,4 +2,4 @@ include LICENSE
+ include README.md
+ recursive-include docs *.md
+ recursive-include skills *.md *.yaml
+-recursive-include tests *.py *.txt *.csv
++recursive-include tests *.py *.txt *.csv *.json *.html *.md
+diff --git a/README.md b/README.md
+index dcd981e147d168535e9f0cb7ad21e8b1fc330b9a..ecf0c66bf877560f2a0c43f6f011a2ecb31db8f1 100644
+--- a/README.md
++++ b/README.md
+@@ -250,6 +250,40 @@ budget may be needed; set `--option llm_max_output_tokens=2048` or higher.
+ See [docs/openai.md](docs/openai.md) for Bash and Python examples, supported
+ options, hosted-data behaviour and troubleshooting.
+ 
++## Online keyword sources
++
++Install the optional networking and HTML parsers:
++
++```powershell
++python -m pip install -e ".[online]"
++keywordmoves plugins --kind keyword
++```
++
++The online suite adds twelve documented API adapters: `google-ads`,
++`search-console`, `dataforseo`, `semrush`, `ahrefs`, `keywordtool`,
++`keywords-everywhere`, `alsoasked`, `serpapi`, `brave-suggest`, `datamuse` and
++`wikipedia`. It also includes three explicitly opt-in experimental browser
++suggestion endpoints, a configurable `website-keywords` public-HTML extractor,
++and **import-only** `ubersuggest` and `answerthepublic` adapters.
++
++```powershell
++keywordmoves run datamuse --operation related --keyword "independent music" --option limit=20
++
++$env:SEMRUSH_API_KEY = "YOUR_SEMRUSH_KEY"
++keywordmoves run semrush --operation related --keyword "independent music" --option database=uk
++```
++
++Online sources use `--keyword` seeds, not reference-text inputs or LLM flags.
++API credentials come from provider-specific environment variables or explicit
++`--option` settings. Most commercial APIs require separate API access and may
++charge credits. A local output limit is not a universal billing cap.
++
++See [the online-source guide and research matrix](docs/online-sources.md) for
++all eighteen plugins, exact operations, credentials, locale conventions,
++website query/extraction rules, access limitations and primary-source links.
++The guide distinguishes API adapters from experimental endpoints and report
++imports: no authenticated production access is implied by offline tests.
++
+ ## Write a keyword plugin
+ 
+ Implement an object with a `descriptor` and `run(request, context)` method, then
+diff --git a/docs/online-sources.md b/docs/online-sources.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..f658dd389a9996fe4e705cca6303e7e4d7557e8c
+--- /dev/null
++++ b/docs/online-sources.md
+@@ -0,0 +1,601 @@
++# Online keyword discovery and analysis
++
++Research date: **2 October 2026**. Integration baseline:
++`23e6959bbaabfe4e34d5c073afc0529bc004b5f4`.
++
++This is a defined set of **18 new adapters**, not a claim to support every online
++SEO product or every endpoint offered by these providers. Twelve adapters use
++provider-documented APIs; three use explicitly experimental browser suggestion
++endpoints; one handles reviewed public HTML; two import user-exported reports.
++The existing `google-trends` CSV importer remains unchanged.
++
++**Access status matters.** The request/response contracts were researched and
++covered by offline tests. Paid accounts, live authenticated API requests and the
++three browser endpoints were not exercised successfully in the build environment.
++Ubersuggest and AnswerThePublic do not have live-query implementations in this
++patch. Their import adapters must not be described as working website scrapers.
++
++## Installation
++
++```powershell
++python -m pip install -e ".[online]"
++keywordmoves plugins --kind keyword
++```
++
++The extra installs HTTPX and Beautiful Soup. Core installs remain dependency-free;
++listing plugins does not import HTTPX, Beautiful Soup or any model runtime. No
++LLM, PyTorch installation or API key for OpenAI is needed for these sources.
++
++Network operations use repeated `--keyword "phrase"` arguments, not `--input`.
++Report imports use `--input`. Online sources do not use the generative runtime
++flags `--llm`, `--model` or `llm_` options. Each provider is selected explicitly;
++there is no automatic paid-provider or website fallback.
++
++## Provider and access matrix
++
++| Plugin | Operations implemented | Route and access requirements | Evidence meaning |
++| --- | --- | --- | --- |
++| `google-ads` | `ideas`, `metrics` | Google Ads REST planning API; OAuth access token, developer token and authorised customer ID | Planning estimates, paid competition and account-currency bids |
++| `search-console` | `queries` | Search Console Search Analytics API; OAuth access to the named property | Observed property clicks, impressions, CTR and average position |
++| `dataforseo` | `ideas`, `suggestions`, `metrics` | DataForSEO Labs Google live endpoints; API login/password and credits | Provider keyword ideas, volume, CPC and difficulty estimates |
++| `semrush` | `related`, `broad-match`, `metrics` | Analytics API v3 keyword reports; API key and suitable account/units | Database-specific keyword volume, CPC and paid competition |
++| `ahrefs` | `matching-terms`, `questions` | API v3 Keywords Explorer matching-terms endpoint; bearer key and API access | Country-specific volume, organic difficulty and CPC in cents |
++| `keywordtool` | `suggestions`, `metrics` | Keyword Tool API v2; API-enabled plan/key | Multi-platform suggestions and explicitly scoped volume estimates |
++| `keywords-everywhere` | `metrics` | Keyword Data API; bearer key and credits | Batch historical volume, CPC and paid competition |
++| `alsoasked` | `questions` | AlsoAsked synchronous Search API; API key and credits | Nested People Also Ask relationships |
++| `serpapi` | `autocomplete`, `related-searches`, `questions` | SerpApi Google endpoints; API key | Search-feature phrases and returned ordering |
++| `brave-suggest` | `suggestions` | Brave Suggest API; subscription token with access | Search suggestions and ordering |
++| `datamuse` | `related`, `synonyms`, `suggestions` | Public documented word API; currently no key in this adapter | Lexical association, not demand |
++| `wikipedia` | `suggestions` | MediaWiki OpenSearch API | Encyclopaedia title/topic suggestions, not demand |
++| `google-autocomplete` | `suggestions` | Experimental browser-client endpoint; `allow_unofficial=true` and robots check | Unofficial autocomplete ordering only |
++| `bing-autocomplete` | `suggestions` | Experimental browser-client endpoint; `allow_unofficial=true` and robots check | Unofficial autocomplete ordering only |
++| `duckduckgo-autocomplete` | `suggestions` | Experimental browser-client endpoint; `allow_unofficial=true` and robots check | Unofficial autocomplete ordering only |
++| `website-keywords` | `query`, `import-html` | Reviewed public URL template and CSS selector, or saved rendered HTML | Literal selected DOM text |
++| `ubersuggest` | `import-csv`, `import-html` | User-exported report; **no live query** | Explicitly mapped report metrics or selected DOM text |
++| `answerthepublic` | `import-csv`, `import-html` | User-exported report; **no live query** | Explicitly mapped report metrics or selected DOM text |
++
++An "official API" capability here means a documented API offered by that
++provider. SerpApi, DataForSEO and other aggregators are not first-party Google
++APIs. API access, quotas, retention rights and costs depend on the provider and
++account. Check the linked provider documentation before enabling production use.
++
++## Credentials
++
++Use environment-based secret injection wherever possible. The following explicit
++options override their environment variable for that provider. A blank explicit
++credential is an error; it does not fall back to a different account silently.
++A `.env` file is not loaded automatically.
++
++| Provider | Environment variable(s) | Explicit option(s) |
++| --- | --- | --- |
++| Google Ads | `GOOGLE_ADS_ACCESS_TOKEN`, `GOOGLE_ADS_DEVELOPER_TOKEN` | `access_token`, `developer_token` |
++| Search Console | `SEARCH_CONSOLE_ACCESS_TOKEN` | `access_token` |
++| DataForSEO | `DATAFORSEO_LOGIN`, `DATAFORSEO_PASSWORD` | `login`, `password` |
++| Semrush | `SEMRUSH_API_KEY` | `api_key` |
++| Ahrefs | `AHREFS_API_KEY` | `api_key` |
++| Keyword Tool | `KEYWORDTOOL_API_KEY` | `api_key` |
++| Keywords Everywhere | `KEYWORDS_EVERYWHERE_API_KEY` | `api_key` |
++| AlsoAsked | `ALSOASKED_API_KEY` | `api_key` |
++| SerpApi | `SERPAPI_API_KEY` | `api_key` |
++| Brave | `BRAVE_SEARCH_API_KEY` | `api_key` |
++
++For example, `$env:SEMRUSH_API_KEY = "YOUR_KEY"` in PowerShell or
++`export SEMRUSH_API_KEY="YOUR_KEY"` in Bash configures the current session.
++Both literal assignments and `--option api_key=...` may enter shell history;
++command-line keys can also appear in process listings. Never commit real keys.
++
++Google access tokens must be obtained and renewed through the normal authorised
++OAuth flow outside this plugin. This patch does not create OAuth clients, store
++refresh tokens, grant permissions, or create/change advertising campaigns.
++
++Keys are not copied into result metadata or normal provider-error messages.
++Semrush and SerpApi require query-string credentials in the implemented routes;
++external HTTP debugging, proxies or application logging can expose those URLs.
++Request options themselves contain secrets for Python callers and must not be
++logged. Proxy/environment HTTP configuration is not inherited (`trust_env=False`).
++
++## Common limits and result semantics
++
++All network adapters support these options through `--option NAME=VALUE`:
++
++| Option | Default | Effect |
++| --- | --- | --- |
++| `limit` | `50` | Maximum candidates emitted, 1–1000. Passed upstream where supported; **not a universal cost cap**. |
++| `max_requests` | `5` | Maximum HTTP calls in one run, 1–20, including robots requests. |
++| `timeout` | `30` | HTTP timeout setting in seconds, 1–120; not a wall-clock deadline for the whole run. |
++| `max_response_bytes` | `2000000` | Maximum decoded response size, 1024–10000000 bytes; also bounds import files. |
++| `min_interval` | `1` | Minimum seconds between requests inside a run, 0–60; cannot reduce the provider's minimum. |
++
++The API request interval floor is one second, four seconds for Keyword Tool, and
++two seconds for experimental browser endpoints. Robots crawl-delay/request-rate
++can increase the interval. These are **per-run safeguards**, not global rate
++coordination: concurrent processes and repeated short runs must still comply
++with account-wide limits. No cache, automatic retry or expansive alphabet/question
++fan-out is performed. A failed or timed-out paid request may still consume credits.
++
++HTTP redirects, authentication failures, rate limiting and unexpected response
++formats stop the operation. No automatic retry is made for 429 or billable POSTs.
++TLS verification remains enabled. A response-size failure is not silently
++truncated into apparently valid data. `max_requests` exhaustion is an error,
++not a claim that the remaining pages were empty.
++
++`KeywordCandidate.score` is deliberately `null`. Instead, `KeywordEvidence`
++records provider-specific metrics and units. Output distinguishes:
++
++- Search suggestions, question relationships and lexical/topic suggestions.
++- Provider estimates of monthly searches, costs and competition.
++- First-party performance for an authorised Search Console property.
++
++Missing values stay `null`; reported zero stays `0`. Paid-ad competition is not
++organic keyword difficulty. A returned-order value is not search popularity or
++organic rank. Metrics from different providers, dates, platforms and geographies
++must not be merged as though they were one comparable score.
++
++Network evidence `observed_at` is the UTC retrieval date, **not the period that
++historical metrics measure**. Results also carry `retrieved_at`, `request_count`,
++`rows_received`, `output_truncated` and a completeness note. Provider periods,
++monthly breakdowns or update times are retained where available. Imports require
++an explicit report observation date. Provider ordering and scoped duplicate
++phrases are retained rather than collapsing different observations together.
++
++## Google Ads: planning ideas and historical metrics
++
++```powershell
++keywordmoves run google-ads --operation ideas `
++  --keyword "independent music" `
++  --option customer_id=1234567890 `
++  --option location_codes=2826 `
++  --option language_id=1000 `
++  --option limit=20
++```
++
++Use `--operation metrics` and repeated keywords for existing phrases.
++`customer_id` is required; hyphens are accepted. Optional `login_customer_id`
++sets the manager-account header. `location_codes` is required, accepts up to ten
++comma-separated Google geo-target IDs; `2826` represents the UK. `language_id`
++defaults to `1000` (English). The network is `GOOGLE_SEARCH`.
++
++The default `api_version=v25` follows the reviewed release line; it can be
++changed explicitly when the API is upgraded. Ideas accept up to 20 seeds;
++historical metrics accept up to 100 in this adapter. Ideas support `page_size`
++(default `limit`, at most 1000), `max_pages` (default 1, at most 10), and
++`page_token`. `next_page_token` is returned when the provider supplies it.
++Historical metrics perform one request. Local output limits can omit results
++when more keyword seeds than the limit are supplied.
++
++Endpoints are `POST /v25/customers/{customer}:generateKeywordIdeas` and
++`:generateKeywordHistoricalMetrics` on `googleads.googleapis.com`.
++Bids remain in **account-currency micros**, not assumed USD. Planning values can
++aggregate close variants. This is not an exact market-wide query counter.
++
++## Search Console: observed queries for your own property
++
++```powershell
++keywordmoves run search-console --operation queries `
++  --option site_url=sc-domain:kieransimkin.co.uk `
++  --option start_date=2026-09-01 --option end_date=2026-09-30 `
++  --option country=gbr --option limit=100
++```
++
++`site_url`, `start_date` and `end_date` are required. The property must exactly
++match one authorised for the token. Optional one `--keyword` applies a
++query-contains filter, not a market-wide search. `country` is a **three-letter**
++code here. `search_type` is `web` (default), `image`, `video` or `news`.
++The plugin requests the `query` dimension with final data.
++
++`page_size` defaults to `limit` and is at most 1000; `max_pages` defaults to 1
++(at most 10); `start_row` defaults to 0. `next_start_row` is returned when another
++page may be available. Search Console explicitly does not guarantee every row;
++pagination does not remove anonymisation or internal top-row limits. Date
++boundaries use **America/Los_Angeles**, not the machine's local timezone.
++
++The request is `POST https://www.googleapis.com/webmasters/v3/sites/{encoded-property}/searchAnalytics/query`.
++CTR is a fraction, not a percentage; average position is not a current rank check.
++
++## DataForSEO Labs
++
++```powershell
++keywordmoves run dataforseo --operation suggestions `
++  --keyword "independent music" --option location_code=2826 `
++  --option language=en --option limit=20
++```
++
++`location_code` is required; `language=en` is the default. `ideas` and `metrics`
++accept up to 100 repeated seeds, `suggestions` takes one. Each request submits
++one task to `/v3/dataforseo_labs/google/{keyword_ideas|keyword_suggestions|keyword_overview}/live`.
++Both envelope and task success codes are checked before accepting results.
++
++Ideas/suggestions support `offset` (default 0); there is no automatic pagination.
++`total_count` and `reported_cost` are retained when returned. CPC is USD; paid
++competition and organic difficulty remain separate. Use your account's current
++pricing to estimate costs, not the local `limit` alone.
++
++## Semrush
++
++```powershell
++keywordmoves run semrush --operation related `
++  --keyword "independent music" --option database=uk --option limit=20
++```
++
++One seed and an explicit `database` are required. Operations map to
++`phrase_related`, `phrase_fullsearch` and `phrase_this` reports at
++`https://api.semrush.com/`. The adapter requests `Ph,Nq,Cp,Co` and parses
++semicolon-separated CSV with the exact declared headers. It requests one
++bounded report, without automatic pagination. Error 50 means no matching data,
++not verified zero searches; other API errors stop the operation. CPC is USD.
++This uses the reviewed v3 Analytics contract, not an assumed v4 migration.
++
++## Ahrefs
++
++```powershell
++keywordmoves run ahrefs --operation questions `
++  --keyword "independent music" --option country=gb --option limit=20
++```
++
++Use `matching-terms` for the broader report. `country` is required; up to 20
++seeds are accepted. Commas inside seeds are rejected because the API joins seeds
++with commas. `match_mode=terms` is the default; `phrase` is available.
++`GET /v3/keywords-explorer/matching-terms` requests
++`keyword,volume,difficulty,cpc`; questions use `terms=questions`.
++**CPC values are in USD cents**, and are labelled `USD_cents` without conversion.
++This adapter performs one request and does not implement every Keywords Explorer
++report or competitor endpoint.
++
++## Keyword Tool: multi-platform suggestions and volume
++
++```powershell
++keywordmoves run keywordtool --operation suggestions `
++  --keyword "independent music" --option platform=youtube `
++  --option country=GB --option language=en --option limit=20
++```
++
++Implemented suggestion platforms:
++`google`, `bing`, `youtube`, `perplexity`, `amazon`, `ebay`, `app-store`,
++`play-store`, `instagram`, `twitter`, `reddit`, `pinterest`, `etsy`, `tiktok`,
++`naver`, `google-trends`. All except `google-trends` support `metrics`.
++These are Keyword Tool's provider routes, **not direct APIs from each platform**.
++
++Suggestions take one seed. Metrics accept up to 100 seeds in this adapter.
++Keywords are limited to 80 characters and ten words each. The default platform
++is Google. The plugin uses a JSON-body API key, not a URL key. `sandbox=true`
++selects `https://api.keywordtool.io/v2-sandbox` instead of production `/v2`.
++`limit` trims local output; it does not cap how many keywords the provider
++returns or charges for. `metrics=false` is the default for suggestions.
++
++For Google volume:
++
++```powershell
++keywordmoves run keywordtool --operation metrics `
++  --keyword "independent music" --keyword "paper plane song" `
++  --option platform=google --option location_code=2826 `
++  --option language=en --option currency=GBP
++```
++
++For Google/Bing, metrics require **their provider-specific `location_code`** and
++use `metrics_location`/`metrics_language`. Google UK is `2826`; Bing UK is `188`.
++For other platforms, metrics use required `country` and `language` instead.
++Suggestions always require `country`. Google/Bing suggestions with `metrics=true`
++require both the suggestion country and metric location; these scopes are kept
++separate in output evidence and metadata.
++
++`currency=USD` is the default. Google `network` defaults to `googlesearchnetwork`
++(includes the partner network); use `googlesearch` to restrict it. Bing defaults
++to `ownedandoperatedandsyndicatedsearch`, with `ownedandoperatedonly` and
++`syndicatedsearchonly` alternatives. Bing `metrics_source=keyword_planner` is
++the default; `historical_data` is available but its coverage/fields differ.
++Optional `category` is sent as the provider's search vertical.
++
++The `suggestion_type` options are platform-specific:
++
++| Platforms | Allowed values; first is the adapter default |
++| --- | --- |
++| Google, Bing | `suggestions`, `questions`, `prepositions`, `related` |
++| YouTube | `suggestions`, `questions`, `prepositions`, `hashtags` |
++| Perplexity | `suggestions`, `questions`, `prepositions` |
++| Amazon, eBay | `suggestions`, `prepositions` |
++| Instagram | `hashtags`, `people` |
++| Twitter | `suggestions`, `hashtags` |
++| Reddit | `suggestions`, `communities`, `profiles` |
++| Google Trends | `top`, `rising` |
++| Other implemented platforms | `suggestions` |
++
++A provider partial-results notice is preserved as `partial_notice` and a partial
++completeness message. Missing volume does not become zero. Google Trends in
++this adapter supplies related phrases only, not a Trends time-series importer.
++
++## Keywords Everywhere
++
++```powershell
++keywordmoves run keywords-everywhere --operation metrics `
++  --keyword "independent music" --keyword "paper plane song" `
++  --option country=gb --option currency=gbp
++```
++
++`country` is required; currency defaults to `usd`. Up to 100 seeds are submitted
++in one form-encoded `POST /v1/get_keyword_data` using repeated `kw[]` fields and
++`dataSource=gkp`. CPC is labelled with the requested currency; trend and
++`credits_consumed` are retained where supplied. These are historical keyword
++metrics, not a claim of real-time volume.
++
++## AlsoAsked
++
++```powershell
++keywordmoves run alsoasked --operation questions `
++  --keyword "independent music" --option country=gb `
++  --option language=en --option depth=2 --option timeout=120
++```
++
++The API route is `POST https://alsoaskedapi.com/v1/search` with `X-Api-Key`.
++`sandbox=true` selects `sandbox.alsoaskedapi.com`. Up to five seeds, required
++`country`, `language=en`, `depth=2` (or 3), and `fresh=false` are supported.
++Requests explicitly use `async=false` and `notify_webhooks=false`.
++
++The plugin walks `queries[].results` recursively, preserving the seed, parent
++question and depth. It does not flatten this into a popularity score. An
++incomplete request is an error; there is no status polling or resubmission.
++After a timeout, inspect the provider account before retrying: a charge may have
++occurred even though the CLI received no usable result. Deeper trees may use
++more credits.
++
++## SerpApi
++
++```powershell
++keywordmoves run serpapi --operation questions `
++  --keyword "independent music" --option country=uk --option language=en
++```
++
++`autocomplete` uses `engine=google_autocomplete`; `related-searches` and
++`questions` use `engine=google`. All use one seed, explicit `country` (`gl`),
++and `language=en` (`hl`) at `https://serpapi.com/search.json`.
++
++Only a confirmed successful search is accepted. A successful Google search can
++legitimately lack a questions or related-searches block; missing autocomplete
++schema is an error. These operations parse one response, not recursive PAA
++expansion or additional organic-result pages. SerpApi is the API provider, not
++Google's first-party Search Console or Ads service.
++
++## Brave Suggest
++
++```powershell
++keywordmoves run brave-suggest --operation suggestions `
++  --keyword "independent music" --option country=GB --option limit=10
++```
++
++`GET https://api.search.brave.com/res/v1/suggest/search` uses an
++`X-Subscription-Token`, one seed, required country and `language=en`.
++The upstream count is capped at 20. Queries are at most 400 characters and
++50 words. Check that your plan permits the intended retention before storing
++results permanently in a keyword register.
++
++## Datamuse and Wikipedia
++
++```powershell
++keywordmoves run datamuse --operation related --keyword "paper planes"
++keywordmoves run datamuse --operation synonyms --keyword "flight"
++keywordmoves run wikipedia --operation suggestions --keyword "Arcadia" --option language=en
++```
++
++Datamuse maps `related` to `/words?ml=`, `synonyms` to `/words?rel_syn=`, and
++`suggestions` to `/sug?s=` on `api.datamuse.com`. This adapter uses its English
++route and returns the provider's lexical ranking score, not demand evidence.
++Public displays should acknowledge Datamuse. Its current documentation announces
++API-key requirements from **1 January 2027**; the unauthenticated adapter may
++need updating then. No undocumented future key parameter has been guessed.
++
++Wikipedia uses `action=opensearch` on the selected language wiki with namespace
++0 and at most 500 titles. It retains page URLs. No user search history or
++pageview/search-volume information is queried.
++
++## Direct website access
++
++### Browser autocomplete endpoints: experimental and opt-in
++
++The following query routes are identified in public browser source code, not
++sold as stable keyword-research APIs by the search engines:
++
++| Adapter | Actual query route | Response extraction |
++| --- | --- | --- |
++| `google-autocomplete` | `https://suggestqueries.google.com/complete/search?client=firefox&q={query}&hl=en` | OpenSearch JSON, strings in index 1 |
++| `bing-autocomplete` | `https://api.bing.com/osjson.aspx?query={query}` | OpenSearch JSON, strings in index 1 |
++| `duckduckgo-autocomplete` | `https://ac.duckduckgo.com/ac/?q={query}&type=list` | OpenSearch JSON, strings in index 1 |
++
++```powershell
++keywordmoves run google-autocomplete --operation suggestions `
++  --keyword "independent music" --option language=en `
++  --option allow_unofficial=true --option limit=10
++```
++
++Each run reads the relevant host's `robots.txt` before querying. A disallow,
++challenge, redirect, unreadable robots response or excessive crawl delay stops
++the query; robots 404/410 means no robots file. There is no bypass switch.
++Returned country is unknown rather than inferred from the machine or an ignored
++country option. Only the Google route implements a language parameter here.
++
++These routes have synthetic parsing/request tests but **were not live-verified
++in the build environment**. They may be blocked or change without notice.
++`allow_unofficial=true` acknowledges this status; it does not bypass a block or
++establish that a use is permitted. There is no proxy rotation, CAPTCHA solving,
++login automation, cookie injection or hidden-endpoint probing.
++
++### Public static HTML: `website-keywords`
++
++For another site, inspect its ordinary public search form and a real public
++results page first. Establish a GET query URL, identify the exact repeated
++keyword element, and test an explicit no-results marker. Supply those reviewed
++rules rather than assuming every site's markup uses the same selector.
++
++This is a **configuration template**, not a working recipe for `example.org`:
++
++```powershell
++keywordmoves run website-keywords --operation query `
++  --keyword "independent music" `
++  --option 'url_template=https://example.org/search?q={query}' `
++  --option 'selector=.keyword-result .phrase' `
++  --option 'empty_selector=.no-keywords'
++```
++
++The plugin percent-encodes the query in the query string. The single `{query}`
++placeholder cannot change the hostname or path. Public HTTPS targets only;
++private, loopback and link-local resolved addresses, credentials in URLs, custom
++ports and redirects are rejected. Robots rules are checked before the result
++page. Never place account tokens or other secrets in a public URL template.
++
++This is a local CLI safeguard, **not a hardened multi-tenant URL proxy**. DNS is
++checked before requesting but not pinned for the connection, so a service
++accepting untrusted URLs also needs network-level egress controls against DNS
++rebinding. Do not expose it as an unrestricted hosted fetch endpoint.
++
++Beautiful Soup extracts text from selected DOM elements, skipping script/style/
++template content and explicitly hidden elements. This is not a browser's full
++computed visibility model. No JavaScript is executed. No selector match is a
++layout/access error unless the configured `empty_selector` positively matches.
++Login forms and common access challenges are rejected rather than scraped as
++keywords. Sites needing POST forms, authentication or dynamic rendering are not
++silently treated as successful static sources.
++
++### Saved rendered HTML
++
++For a page you can legitimately view but which needs client-side rendering,
++save its rendered result DOM with the necessary result elements, then import:
++
++```powershell
++keywordmoves run website-keywords --operation import-html `
++  --input .\rendered-results.html `
++  --option 'selector=.keyword-result .phrase' `
++  --option observed_at=2026-10-02
++```
++
++`source_url` and `country` can be recorded. The operation is explicitly marked
++`live_query_performed=false`; it is not an automated browser session.
++
++## Ubersuggest and AnswerThePublic: report import, not invented scrapers
++
++Ubersuggest's own support article states that it does not offer API or webhook
++functionality. Its public app entry redirects to a JavaScript-based keyword
++interface; the inspected public material did not establish an unauthenticated,
++stable GET query-to-results contract. AnswerThePublic exposes a public search
++form, but this research did not verify a supported developer API or a reproducible
++unauthenticated result endpoint. That is **not** a claim that no private or
++partner API exists. No internal authenticated routes or fabricated CSS recipes
++have been implemented for either tool.
++
++Use their normal interface to run a query and obtain an allowed export, then
++import it with explicit column meanings. The example headings below must be
++replaced with the exact headings in your own report:
++
++```powershell
++keywordmoves run ubersuggest --operation import-csv `
++  --input .\keyword-report.csv `
++  --option phrase_column=Keyword --option volume_column=Volume `
++  --option cpc_column=CPC --option currency=USD `
++  --option difficulty_column=Difficulty `
++  --option platform=Google --option country=GB `
++  --option observed_at=2026-10-02
++```
++
++Replace `ubersuggest` with `answerthepublic` for that report. Only
++`phrase_column`, `platform` and `observed_at` are required; volume, CPC and
++difficulty columns are optional. A CPC column requires its currency. Accepted
++delimiters are comma (default), semicolon or `tab`. Files must be UTF-8, with
++optional BOM. Numeric values use a dot decimal separator; valid comma thousands
++groups are accepted. Ambiguous decimal-comma values and numeric ranges are
++rejected, not interpreted as zeros. Missing markers `N/A`, `null`, `-` and empty
++cells remain null. A provider-reported zero remains zero.
++
++Both tools also accept `import-html` with the same explicit selector, platform
++and report-date requirements. Inputs are marked `access=user-export` and
++`live_query_performed=false`. These plugins do not provide live website querying
++until a working, reviewable public access contract is established.
++
++## Reusing local candidates
++
++These adapters retain the existing `PluginRequest` / `PluginResult` interface.
++For example, take an intentionally bounded list from NLTK, spaCy or KeyBERT and
++request one batch of Keywords Everywhere metrics:
++
++```python
++from keywordmoves import PluginRegistry, PluginRequest
++from keywordmoves.models import ExecutionContext
++
++registry = PluginRegistry()
++local = registry.get("nltk").run(
++    PluginRequest("extract", options={
++        "text": "Paper planes drift over the city at night.",
++        "limit": 10,
++    }),
++    ExecutionContext(llms=None),
++)
++terms = tuple(dict.fromkeys(candidate.phrase for candidate in local.keywords))
++if terms:
++    measured = registry.get("keywords-everywhere").run(
++        PluginRequest("metrics", keywords=terms[:100],
++                      options={"country": "gb", "currency": "gbp", "limit": 100}),
++        ExecutionContext(llms=None),
++    )
++    print(measured.to_dict())
++```
++
++The local extractor's optional package/resources must already be installed and
++the metrics API key configured. Review the candidates before a paid run. The
++example does not silently send the entire library of reference text to a service.
++Network discovery sends keyword seeds and selected scope parameters; HTML and
++CSV imports process the files locally.
++
++## Tests and implementation limits
++
++```powershell
++python -m pip install -e ".[dev,online]"
++python -m pytest tests/test_online_api.py tests/test_online_transport.py tests/test_online_websites.py
++python -m ruff check .
++```
++
++Fixtures under `tests/fixtures/online` are explicitly **synthetic**, not copied
++live provider data. Tests use HTTPX MockTransport, exercising real request
++encoding, headers and response parsing without credentials, quota use or network
++access. They cover every implemented API operation and Keyword Tool platform
++route, pagination, null/zero handling, units, credentials, bounds, errors,
++robots policies, public URL checks, DOM challenges and imports. This validates
++adapter contracts, not subscription entitlements or current live availability.
++
++A separate `online-source-contracts` workflow runs these tests and linting on
++Python 3.10–3.13, Linux and Windows. It never spends API credits. Existing
++model-backed CI jobs remain separate. No paid-service CI smoke test is enabled.
++
++Provider changes may require an adapter update. This patch does not implement
++OAuth authorisation, unlimited page walking, cross-service automatic enrichment,
++interactive browsers, account login scraping, account-wide spend limits, every
++endpoint of each vendor, or every SEO vendor on the market. The access matrix
++above is the exact implemented scope, including its import-only limitations.
++
++## Primary sources and verification trail
++
++All entries below were reviewed on **2026-10-02**. They document the source
++contracts or access constraints, not a successful live run with an account.
++
++| Source | Documentation used |
++| --- | --- |
++| Google Ads | [Keyword ideas](https://developers.google.com/google-ads/api/docs/keyword-planning/generate-keyword-ideas); [historical metrics](https://developers.google.com/google-ads/api/docs/keyword-planning/generate-historical-metrics); [release notes](https://developers.google.com/google-ads/api/docs/release-notes) |
++| Search Console | [Search Analytics query contract, date semantics and incompleteness](https://developers.google.com/webmaster-tools/v1/searchanalytics/query) |
++| DataForSEO | [Keyword ideas](https://docs.dataforseo.com/v3/dataforseo_labs-google-keyword_ideas-live/); [suggestions](https://docs.dataforseo.com/v3/dataforseo_labs-google-keyword_suggestions-live/); [overview](https://docs.dataforseo.com/v3/dataforseo_labs-google-keyword_overview-live/) |
++| Semrush | [Analytics API keyword reports](https://developer.semrush.com/api/v3/seo/keyword-reports/) |
++| Ahrefs | [Keywords Explorer matching terms; CPC units](https://docs.ahrefs.com/en/api/reference/keywords-explorer/get-matching-terms) |
++| Keyword Tool | [API v2 routes, per-platform parameters, locations, networks, response fields and partial notices](https://keywordtool.io/api) |
++| Keywords Everywhere | [API documentation](https://keywordseverywhere.com/api-documentation.html) |
++| AlsoAsked | [Official client README and request/results examples](https://github.com/AlsoAsked/also-asked-php/blob/main/README.md); [API-key header](https://github.com/AlsoAsked/also-asked-php/blob/main/generated/Authentication/ApiKeyAuthentication.php); [request-field normalisation](https://github.com/AlsoAsked/also-asked-php/blob/main/generated/Normalizer/SearchRequestOptionsNormalizer.php) |
++| SerpApi | [Google autocomplete](https://serpapi.com/google-autocomplete-api); [related questions](https://serpapi.com/related-questions); [related searches](https://serpapi.com/related-searches) |
++| Brave | [Suggestion endpoint](https://api-dashboard.search.brave.com/api-reference/other/suggestions) |
++| Datamuse | [Word API, lexical scores, attribution and January 2027 change](https://datamuse.com/api/) |
++| Wikipedia | [MediaWiki OpenSearch](https://www.mediawiki.org/wiki/API:Opensearch) |
++| Google browser suggestions | [Mozilla search configuration](https://searchfox.org/firefox-main/source/services/settings/dumps/main/search-config-v2.json) |
++| Bing browser suggestions | [Mozilla iOS search-data implementation](https://searchfox.org/mozilla-mobile/source/firefox-ios/SampleBrowser/SampleBrowser/Networking/SearchDataProvider.swift) |
++| DuckDuckGo browser suggestions | [Mozilla search-plugin XML](https://searchfox.org/comm-central/source/suite/components/search/searchplugins/duckduckgo.xml) |
++| Ubersuggest | [Provider's API/webhook statement](https://ubersuggest.zendesk.com/hc/en-us/articles/4405444620059-Ubersuggest-API-and-Webhooks-What-Users-Need-to-Know); [report exports](https://ubersuggest.zendesk.com/hc/en-us/articles/4405444702875-Exporting-Reports-with-Ubersuggest); [app entry inspected](https://app.neilpatel.com/en/ubersuggest/) |
++| AnswerThePublic | [Public interface inspected](https://answerthepublic.com/en); [plans and export features](https://answerthepublic.com/en/pricing) |
++| Existing Google Trends | [Official API alpha announcement](https://developers.google.com/search/blog/2025/07/trends-api); existing CSV import retained rather than inventing a live contract |
++
++A browser-source endpoint is evidence that a client has used a route; it is not
++a supported developer API guarantee or evidence of blanket permission to scrape.
++For Ubersuggest and AnswerThePublic the reviewed pages were insufficient to
++establish a live query parser. The import-only implementation and this explicit
++limitation preserve that uncertainty instead of presenting guessed requests as
++working integrations.
+diff --git a/pyproject.toml b/pyproject.toml
+index 99e0b80599d19e1689f1f0f369d9ffafce1f2e20..e25930ed0c3ffaec3f860fe7120aeb8f96c0b7f0 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -24,6 +24,7 @@ classifiers = [
+ dependencies = []
+ 
+ [project.optional-dependencies]
++online = ["httpx>=0.27,<1", "beautifulsoup4>=4.12,<5"]
+ keybert = [
+   "keybert>=0.9,<1",
+   "sentence-transformers>=3.4,<6",
+@@ -49,6 +50,24 @@ dev = [
+ keywordmoves = "keywordmoves.cli:main"
+ 
+ [project.entry-points."keywordmoves.plugins"]
++ahrefs = "keywordmoves.online.commercial:AhrefsPlugin"
++alsoasked = "keywordmoves.online.discovery:AlsoAskedPlugin"
++answerthepublic = "keywordmoves.online.websites:AnswerThePublicPlugin"
++bing-autocomplete = "keywordmoves.online.websites:BingAutocompletePlugin"
++brave-suggest = "keywordmoves.online.discovery:BraveSuggestPlugin"
++dataforseo = "keywordmoves.online.commercial:DataForSEOPlugin"
++datamuse = "keywordmoves.online.discovery:DatamusePlugin"
++duckduckgo-autocomplete = "keywordmoves.online.websites:DuckDuckGoAutocompletePlugin"
++google-ads = "keywordmoves.online.google:GoogleAdsPlugin"
++google-autocomplete = "keywordmoves.online.websites:GoogleAutocompletePlugin"
++keywords-everywhere = "keywordmoves.online.commercial:KeywordsEverywherePlugin"
++keywordtool = "keywordmoves.online.commercial:KeywordToolPlugin"
++search-console = "keywordmoves.online.google:SearchConsolePlugin"
++semrush = "keywordmoves.online.commercial:SemrushPlugin"
++serpapi = "keywordmoves.online.discovery:SerpAPIPlugin"
++ubersuggest = "keywordmoves.online.websites:UbersuggestPlugin"
++website-keywords = "keywordmoves.online.websites:WebsiteKeywordsPlugin"
++wikipedia = "keywordmoves.online.discovery:WikipediaPlugin"
+ keybert = "keywordmoves.builtin.keybert_keywords:KeyBERTKeywordPlugin"
+ nltk = "keywordmoves.builtin.nltk_keywords:NLTKKeywordPlugin"
+ google-trends = "keywordmoves.builtin.google_trends:GoogleTrendsPlugin"
+diff --git a/src/keywordmoves/online/__init__.py b/src/keywordmoves/online/__init__.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..9ed0fab533188eaf78522b852c2c322c9b854c11
+--- /dev/null
++++ b/src/keywordmoves/online/__init__.py
+@@ -0,0 +1,39 @@
++"""Independent online keyword providers. All third-party imports are lazy."""
++from __future__ import annotations
++
++from typing import Any, Callable
++
++
++def factories() -> dict[str, Callable[[], Any]]:
++    from .commercial import (
++        AhrefsPlugin,
++        DataForSEOPlugin,
++        KeywordsEverywherePlugin,
++        KeywordToolPlugin,
++        SemrushPlugin,
++    )
++    from .discovery import (
++        AlsoAskedPlugin,
++        BraveSuggestPlugin,
++        DatamusePlugin,
++        SerpAPIPlugin,
++        WikipediaPlugin,
++    )
++    from .google import GoogleAdsPlugin, SearchConsolePlugin
++    from .websites import (
++        AnswerThePublicPlugin,
++        BingAutocompletePlugin,
++        DuckDuckGoAutocompletePlugin,
++        GoogleAutocompletePlugin,
++        UbersuggestPlugin,
++        WebsiteKeywordsPlugin,
++    )
++
++    classes = (
++        AhrefsPlugin, AlsoAskedPlugin, AnswerThePublicPlugin, BingAutocompletePlugin,
++        BraveSuggestPlugin, DataForSEOPlugin, DatamusePlugin, DuckDuckGoAutocompletePlugin,
++        GoogleAdsPlugin, GoogleAutocompletePlugin, KeywordsEverywherePlugin, KeywordToolPlugin,
++        SearchConsolePlugin, SemrushPlugin, SerpAPIPlugin, UbersuggestPlugin,
++        WebsiteKeywordsPlugin, WikipediaPlugin,
++    )
++    return {plugin.descriptor.name: plugin for plugin in classes}
+diff --git a/src/keywordmoves/online/commercial.py b/src/keywordmoves/online/commercial.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..d5ab323bf768379241f34dbe2fda4c2cd843dd43
+--- /dev/null
++++ b/src/keywordmoves/online/commercial.py
+@@ -0,0 +1,252 @@
++"""Documented commercial APIs: explicit accounts, geography and source-specific metrics."""
++from __future__ import annotations
++
++import base64
++import csv
++import io
++from dataclasses import replace
++
++from ..models import PluginDescriptor
++from .common import (
++    ConfigurationError,
++    OnlinePlugin,
++    OnlineSourceError,
++    array,
++    boolean,
++    candidate,
++    choice,
++    code,
++    integer,
++    number,
++    obj,
++    provider_error,
++    secret,
++    seeds,
++    text,
++)
++
++
++class DataForSEOPlugin(OnlinePlugin):
++    descriptor = PluginDescriptor("dataforseo", "DataForSEO Labs Google ideas, suggestions and keyword metrics.",
++                                  ("discover", "analyse", "official-api"), ("ideas", "suggestions", "metrics"))
++    hosts = ("api.dataforseo.com",)
++
++    def fetch(self, request, http, observed):
++        o = request.options
++        terms = seeds(request, 1 if request.operation == "suggestions" else 100)
++        location = integer(o, "location_code", 0, 1, 999999)
++        language = code(o, "language", "en", r"[a-z]{2}(-[A-Z]{2})?")
++        limit = integer(o, "limit", 50, 1, 1000)
++        endpoints = {"ideas": "keyword_ideas", "suggestions": "keyword_suggestions", "metrics": "keyword_overview"}
++        body = {"location_code": location, "language_code": language}
++        body["keyword" if request.operation == "suggestions" else "keywords"] = terms[0] if request.operation == "suggestions" else terms
++        if request.operation != "metrics":
++            body.update(limit=limit, offset=integer(o, "offset", 0, 0, 1000000))
++        credentials = secret(o, "login", "DATAFORSEO_LOGIN") + ":" + secret(o, "password", "DATAFORSEO_PASSWORD")
++        headers = {"Authorization": "Basic " + base64.b64encode(credentials.encode()).decode()}
++        data = obj(http.json("POST", f"https://api.dataforseo.com/v3/dataforseo_labs/google/{endpoints[request.operation]}/live",
++                            headers=headers, json=[body]))
++        if data.get("status_code") != 20000:
++            raise OnlineSourceError("DataForSEO rejected the request; check API access, credits and parameters.")
++        tasks = array(data.get("tasks"))
++        if len(tasks) != 1 or obj(tasks[0]).get("status_code") != 20000:
++            raise OnlineSourceError("DataForSEO task did not succeed; no partial data was accepted.")
++        results = array(tasks[0].get("result") or [])
++        items, total = [], None
++        for result in results:
++            result = obj(result)
++            total = result.get("total_count", total)
++            for row in array(result.get("items") or []):
++                row = obj(row)
++                info = obj(row.get("keyword_info") or {})
++                properties = obj(row.get("keyword_properties") or {})
++                items.append(candidate("DataForSEO Labs Google", row.get("keyword"), {
++                    "estimated_search_volume": (number(info.get("search_volume")), "searches_per_month"),
++                    "cpc": (number(info.get("cpc")), "USD"),
++                    "paid_competition": (number(info.get("competition")), "index_0_1"),
++                    "organic_keyword_difficulty": (number(properties.get("keyword_difficulty")), "index_0_100"),
++                }, observed_at=observed, geography=str(location),
++                    metadata={"language": language, "provider_updated_at": info.get("last_updated_time"),
++                              "monthly_searches": info.get("monthly_searches", [])},
++                    note="Provider estimates; paid-ad competition and organic difficulty are different measures."))
++        return items, {"location_code": location, "language": language, "total_count": total,
++                       "reported_cost": number(data.get("cost"))}, ["This paid live endpoint may charge for every request, including repeated requests."]
++
++
++class SemrushPlugin(OnlinePlugin):
++    descriptor = PluginDescriptor("semrush", "Semrush related/broad-match keywords and single-keyword overview.",
++                                  ("discover", "analyse", "official-api"), ("related", "broad-match", "metrics"))
++    hosts = ("api.semrush.com",)
++
++    def fetch(self, request, http, observed):
++        o = request.options
++        seed = seeds(request)[0]
++        database = code(o, "database", pattern=r"[a-z]{2}")
++        report = {"related": "phrase_related", "broad-match": "phrase_fullsearch", "metrics": "phrase_this"}[request.operation]
++        params = {"type": report, "key": secret(o, "api_key", "SEMRUSH_API_KEY"),
++                  "phrase": seed, "database": database,
++                  "display_limit": integer(o, "limit", 50, 1, 1000),
++                  "export_columns": "Ph,Nq,Cp,Co", "export_decode": 1, "export_escape": 1}
++        _, data = http.request("GET", "https://api.semrush.com/", params=params)
++        if data.strip().startswith("ERROR 50"):
++            return [], {"database": database}, ["Semrush reported no matching data; this is not evidence of zero demand."]
++        if data.lstrip().startswith("ERROR"):
++            raise OnlineSourceError("Semrush reported an API error; check API units, database and subscription.")
++        reader = csv.DictReader(io.StringIO(data), delimiter=";")
++        required = {"Keyword", "Search Volume", "CPC", "Competition"}
++        if not required.issubset(set(reader.fieldnames or [])):
++            raise OnlineSourceError("Semrush returned an unexpected CSV header or a website challenge.")
++        items = []
++        for row in reader:
++            if None in row or any(row[k] is None for k in required):
++                raise OnlineSourceError("Semrush returned a malformed CSV record.")
++            items.append(candidate("Semrush Analytics API", row["Keyword"], {
++                "estimated_search_volume": (number(row["Search Volume"]), "searches_per_month"),
++                "cpc": (number(row["CPC"]), "USD"),
++                "paid_competition": (number(row["Competition"]), "index_0_1"),
++            }, observed_at=observed, geography=database, note="Database-specific provider estimates, not exact observed demand."))
++        return items, {"database": database, "report": report}, ["A single bounded report is requested; this plugin does not auto-page or auto-retry paid calls."]
++
++
++class AhrefsPlugin(OnlinePlugin):
++    descriptor = PluginDescriptor("ahrefs", "Ahrefs Keywords Explorer matching terms and question keywords.",
++                                  ("discover", "analyse", "official-api"), ("matching-terms", "questions"))
++    hosts = ("api.ahrefs.com",)
++
++    def fetch(self, request, http, observed):
++        o = request.options
++        keywords = seeds(request, 20)
++        if any("," in word for word in keywords):
++            raise ConfigurationError("Ahrefs keywords cannot contain commas (the API uses comma-separated input).")
++        country = code(o, "country").lower()
++        params = {"keywords": ",".join(keywords), "country": country,
++                  "select": "keyword,volume,difficulty,cpc", "output": "json",
++                  "limit": integer(o, "limit", 50, 1, 1000),
++                  "terms": "questions" if request.operation == "questions" else "all",
++                  "match_mode": choice(o, "match_mode", "terms", ("terms", "phrase"))}
++        headers = {"Authorization": "Bearer " + secret(o, "api_key", "AHREFS_API_KEY")}
++        data = provider_error(http.json("GET", "https://api.ahrefs.com/v3/keywords-explorer/matching-terms", params=params, headers=headers))
++        items = []
++        for row in array(data.get("keywords")):
++            row = obj(row)
++            items.append(candidate("Ahrefs Keywords Explorer", row.get("keyword"), {
++                "estimated_search_volume": (number(row.get("volume")), "searches_per_month"),
++                "organic_keyword_difficulty": (number(row.get("difficulty")), "index_0_100"),
++                "cpc": (number(row.get("cpc")), "USD_cents"),
++            }, observed_at=observed, geography=country,
++                note="Ahrefs estimates; CPC is preserved in cents, not dollars."))
++        return items, {"country": country}, ["API access and units depend on the Ahrefs account. No website fallback is attempted."]
++
++
++class KeywordToolPlugin(OnlinePlugin):
++    descriptor = PluginDescriptor("keywordtool", "Keyword Tool v2 multi-platform suggestions and volume metrics.",
++                                  ("discover", "analyse", "official-api"), ("suggestions", "metrics"))
++    hosts = ("api.keywordtool.io",)
++    interval = 4.0
++    platforms = ("google", "bing", "youtube", "perplexity", "amazon", "ebay", "app-store",
++                 "play-store", "instagram", "twitter", "reddit", "pinterest", "etsy", "tiktok", "naver",
++                 "google-trends")
++    suggestion_types = {
++        "google": ("suggestions", "questions", "prepositions", "related"),
++        "bing": ("suggestions", "questions", "prepositions", "related"),
++        "youtube": ("suggestions", "questions", "prepositions", "hashtags"),
++        "perplexity": ("suggestions", "questions", "prepositions"),
++        "amazon": ("suggestions", "prepositions"), "ebay": ("suggestions", "prepositions"),
++        "instagram": ("hashtags", "people"), "twitter": ("suggestions", "hashtags"),
++        "reddit": ("suggestions", "communities", "profiles"),
++        "google-trends": ("top", "rising"),
++    }
++
++    def fetch(self, request, http, observed):
++        o = request.options
++        platform = choice(o, "platform", "google", self.platforms)
++        key = secret(o, "api_key", "KEYWORDTOOL_API_KEY")
++        terms = seeds(request, 100 if request.operation == "metrics" else 1)
++        if any(len(term) > 80 or len(term.split()) > 10 for term in terms):
++            raise ConfigurationError("Keyword Tool keywords must be at most 80 characters and 10 words.")
++        metrics = request.operation == "metrics" or boolean(o, "metrics")
++        if platform == "google-trends" and metrics:
++            raise ConfigurationError("Keyword Tool's Google Trends route supports suggestions, not volume metrics.")
++        body = {"apikey": key, "keyword": terms if request.operation == "metrics" else terms[0],
++                "output": "json"}
++        country, metric_geo = None, None
++        language = code(o, "language", "en")
++        currency = code(o, "currency", "USD", r"[A-Za-z]{3}").upper()
++        if request.operation == "suggestions" or platform not in {"google", "bing"}:
++            country = code(o, "country").upper()
++            body.update(country=country, language=language)
++        if request.operation == "suggestions":
++            kinds = self.suggestion_types.get(platform, ("suggestions",))
++            body.update(metrics=metrics, type=choice(o, "suggestion_type", kinds[0], kinds))
++        if metrics:
++            body["metrics_currency"] = currency
++            if platform in {"google", "bing"}:
++                location = integer(o, "location_code", 0, 1, 9999999)
++                body.update(metrics_location=[location], metrics_language=[language])
++                metric_geo = f"{platform}:location:{location}"
++                networks = (("googlesearchnetwork", "googlesearch") if platform == "google" else
++                            ("ownedandoperatedandsyndicatedsearch", "ownedandoperatedonly", "syndicatedsearchonly"))
++                body["metrics_network"] = choice(o, "network", networks[0], networks)
++                if platform == "bing":
++                    body["metrics_source"] = choice(o, "metrics_source", "keyword_planner", ("keyword_planner", "historical_data"))
++            else:
++                metric_geo = country
++        if "category" in o:
++            body["category"] = text(o, "category")
++        version = "v2-sandbox" if boolean(o, "sandbox") else "v2"
++        route = "volume" if request.operation == "metrics" else "suggestions"
++        data = provider_error(http.json("POST", f"https://api.keywordtool.io/{version}/search/{route}/{platform}", json=body))
++        results = obj(data.get("results"))
++        items = []
++        for index, (word, row) in enumerate(results.items(), 1):
++            row = obj(row)
++            values = {"returned_order": (index, "ordinal")}
++            if metrics:
++                values.update(estimated_search_volume=(number(row.get("volume")), "searches_per_month"),
++                              cpc=(number(row.get("cpc")), currency),
++                              paid_competition=(number(row.get("cmp")), "index_0_1"))
++            monthly = {k: v for k, v in row.items() if k.startswith("m") and k[1:2].isdigit()}
++            item = candidate("Keyword Tool API", row.get("string", word), values,
++                             observed_at=observed, geography=metric_geo,
++                             metadata={"platform": platform, "monthly_metrics": monthly,
++                                       "suggestion_country": country, "metrics_geography": metric_geo,
++                                       "metrics_network": body.get("metrics_network"),
++                                       "metrics_source": body.get("metrics_source"), "language": language},
++                             note="Returned order is not demand. Metrics use their own explicit geography and provider scope.")
++            item = replace(item, evidence=tuple(replace(e, geography=country)
++                                                if e.metric == "returned_order" else e
++                                                for e in item.evidence))
++            items.append(item)
++        notice = data.get("notice")
++        meta = {"platform": platform, "total_keywords": data.get("total_keywords"),
++                "sandbox": boolean(o, "sandbox"), "partial_notice": bool(notice)}
++        if notice:
++            meta["completeness"] = "partial provider response; missing metrics remain null"
++        return items, meta, ["The local output limit is not a billing cap: this API may return/charge for a larger result set."]
++
++
++class KeywordsEverywherePlugin(OnlinePlugin):
++    descriptor = PluginDescriptor("keywords-everywhere", "Keywords Everywhere batch volume, CPC and competition data.",
++                                  ("analyse", "official-api"), ("metrics",))
++    hosts = ("api.keywordseverywhere.com",)
++
++    def fetch(self, request, http, observed):
++        o = request.options
++        terms = seeds(request, 100)
++        country = code(o, "country").lower()
++        currency = code(o, "currency", "usd", r"[A-Za-z]{3}").lower()
++        headers = {"Authorization": "Bearer " + secret(o, "api_key", "KEYWORDS_EVERYWHERE_API_KEY")}
++        data = provider_error(http.json("POST", "https://api.keywordseverywhere.com/v1/get_keyword_data",
++                                        headers=headers, data={"dataSource": "gkp", "country": country,
++                                                              "currency": currency, "kw[]": terms}))
++        items = []
++        for row in array(data.get("data")):
++            row = obj(row)
++            cpc = obj(row.get("cpc") or {})
++            items.append(candidate("Keywords Everywhere", row.get("keyword"), {
++                "estimated_search_volume": (number(row.get("vol")), "searches_per_month"),
++                "cpc": (number(cpc.get("value")), currency.upper()),
++                "paid_competition": (number(row.get("competition")), "index_0_1"),
++            }, observed_at=observed, geography=country, metadata={"trend": row.get("trend", [])},
++                note="Historical provider planning data; not organic SEO difficulty."))
++        return items, {"country": country, "credits_consumed": number(data.get("credits_consumed"))}, []
+diff --git a/src/keywordmoves/online/common.py b/src/keywordmoves/online/common.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..5c41696b53f4d578b4e06dcfa5a6196a5e64bd59
+--- /dev/null
++++ b/src/keywordmoves/online/common.py
+@@ -0,0 +1,269 @@
++"""Bounded, optional HTTP access and explicit evidence for online sources.
++
++Nothing in this module imports a network dependency or reads credentials at import time.
++"""
++from __future__ import annotations
++
++import json
++import math
++import os
++import re
++import time
++from datetime import date, datetime, timezone
++from typing import Any, Mapping
++from urllib.parse import urlsplit
++
++from ..errors import ConfigurationError, KeywordMovesError
++from ..models import (
++    ExecutionContext,
++    KeywordCandidate,
++    KeywordEvidence,
++    PluginRequest,
++    PluginResult,
++)
++
++USER_AGENT = "KeywordMoves/0.2 (+https://github.com/kieransimkin/keywordmoves)"
++
++
++class OnlineSourceError(KeywordMovesError):
++    """A request failed or its response cannot be interpreted reliably."""
++
++
++def text(options: Mapping[str, Any], key: str, default: Any = None) -> str:
++    value = options.get(key, default)
++    if not isinstance(value, (str, int)) or isinstance(value, bool) or not str(value).strip():
++        raise ConfigurationError(f"Supply a non-empty {key} option.")
++    result = str(value).strip()
++    if any(ord(c) < 32 for c in result):
++        raise ConfigurationError(f"Control characters are not allowed in {key}.")
++    return result
++
++
++def integer(options: Mapping[str, Any], key: str, default: int, low: int, high: int) -> int:
++    value = options.get(key, default)
++    if isinstance(value, bool) or not re.fullmatch(r"[0-9]+", str(value)):
++        raise ConfigurationError(f"{key} must be an integer between {low} and {high}.")
++    value = int(value)
++    if not low <= value <= high:
++        raise ConfigurationError(f"{key} must be between {low} and {high}.")
++    return value
++
++
++def boolean(options: Mapping[str, Any], key: str, default: bool = False) -> bool:
++    value = options.get(key, default)
++    if isinstance(value, bool):
++        return value
++    if isinstance(value, str) and value.lower() in {"true", "false"}:
++        return value.lower() == "true"
++    raise ConfigurationError(f"{key} must be true or false.")
++
++
++def choice(options: Mapping[str, Any], key: str, default: str, allowed: tuple[str, ...]) -> str:
++    value = text(options, key, default)
++    if value not in allowed:
++        raise ConfigurationError(f"{key} must be one of: {', '.join(allowed)}.")
++    return value
++
++
++def code(options: Mapping[str, Any], key: str, default: str | None = None,
++         pattern: str = r"[A-Za-z]{2}") -> str:
++    value = text(options, key, default)
++    if not re.fullmatch(pattern, value):
++        raise ConfigurationError(f"{key} has an invalid format; see docs/online-sources.md.")
++    return value
++
++
++def iso_date(options: Mapping[str, Any], key: str) -> str:
++    value = text(options, key)
++    try:
++        parsed = date.fromisoformat(value)
++        if value != parsed.isoformat():
++            raise ValueError
++    except ValueError:
++        raise ConfigurationError(f"{key} must use YYYY-MM-DD.") from None
++    return value
++
++
++def secret(options: Mapping[str, Any], key: str, env: str) -> str:
++    value = options[key] if key in options else os.environ.get(env)
++    if not isinstance(value, str) or not value.strip() or any(ord(c) < 32 for c in value):
++        raise ConfigurationError(f"Set {env} or --option {key}=... to a valid credential.")
++    return value.strip()
++
++
++def seeds(request: PluginRequest, maximum: int = 1) -> list[str]:
++    values = list(dict.fromkeys(request.keywords))
++    if not 1 <= len(values) <= maximum:
++        raise ConfigurationError(f"Supply between 1 and {maximum} --keyword values.")
++    if any(not isinstance(v, str) or not v.strip() or len(v) > 400 or
++           any(ord(c) < 32 for c in v) for v in values):
++        raise ConfigurationError("Keywords must be non-empty text, at most 400 characters each.")
++    return [v.strip() for v in values]
++
++
++def number(value: Any) -> int | float | None:
++    if value is None or value == "":
++        return None
++    if isinstance(value, bool):
++        raise OnlineSourceError("The provider returned a boolean instead of a numeric metric.")
++    try:
++        result = float(value)
++    except (ValueError, TypeError, OverflowError):
++        raise OnlineSourceError("The provider returned an invalid numeric metric.") from None
++    if not math.isfinite(result):
++        raise OnlineSourceError("The provider returned a non-finite numeric metric.")
++    return int(result) if result.is_integer() else result
++
++
++def obj(value: Any) -> dict[str, Any]:
++    if not isinstance(value, dict):
++        raise OnlineSourceError("Unexpected provider response: expected a JSON object.")
++    return value
++
++
++def array(value: Any) -> list[Any]:
++    if not isinstance(value, list):
++        raise OnlineSourceError("Unexpected provider response: expected a result array.")
++    return value
++
++
++def phrase(value: Any) -> str:
++    if not isinstance(value, str) or not value.strip() or len(value) > 4000:
++        raise OnlineSourceError("Unexpected provider response: invalid keyword text.")
++    return " ".join(value.split())
++
++
++def provider_error(payload: Any) -> dict[str, Any]:
++    payload = obj(payload)
++    if payload.get("error") or payload.get("errors"):
++        raise OnlineSourceError("The provider reported an API error; check access, quota and options.")
++    return payload
++
++
++def candidate(source: str, word: Any, metrics: Mapping[str, tuple[Any, str]], *,
++              observed_at: str, geography: str | None = None, relationship: str = "discovered",
++              metadata: Mapping[str, Any] | None = None, note: str = "") -> KeywordCandidate:
++    return KeywordCandidate(
++        phrase=phrase(word), relationship=relationship, score=None,
++        evidence=tuple(KeywordEvidence(source=source, metric=metric, value=value, unit=unit,
++                                       observed_at=observed_at, geography=geography, notes=note)
++                       for metric, (value, unit) in metrics.items()),
++        metadata=dict(metadata or {}),
++    )
++
++
++class HTTP:
++    """One run, fixed hosts, no redirects/retries, bounded decoded response size.
++
++    transport is an optional httpx transport for tests. It is never set via CLI options.
++    """
++    def __init__(self, options: Mapping[str, Any], hosts: tuple[str, ...], transport: Any = None,
++                 interval: float = 1.0) -> None:
++        self.maximum = integer(options, "max_requests", 5, 1, 20)
++        self.max_bytes = integer(options, "max_response_bytes", 2_000_000, 1024, 10_000_000)
++        self.timeout = integer(options, "timeout", 30, 1, 120)
++        self.interval = max(interval, integer(options, "min_interval", 1, 0, 60))
++        self.hosts, self.transport = hosts, transport
++        self.requests = 0
++        self.last_request = 0.0
++        self.client: Any = None
++
++    def __enter__(self) -> HTTP:
++        try:
++            import httpx
++        except ImportError:
++            raise ConfigurationError("Install the optional dependencies: pip install 'keywordmoves[online]'.") from None
++        self.client = httpx.Client(transport=self.transport, timeout=self.timeout, trust_env=False,
++                                   follow_redirects=False, headers={"User-Agent": USER_AGENT})
++        return self
++
++    def __exit__(self, *args: Any) -> None:
++        self.client.close()
++
++    def request(self, method: str, url: str, *, allowed_statuses: tuple[int, ...] = (),
++                **kwargs: Any) -> tuple[int, str]:
++        import httpx
++
++        try:
++            parsed = urlsplit(url)
++            port = parsed.port
++        except ValueError:
++            raise ConfigurationError("The provider URL is malformed.") from None
++        if (parsed.scheme != "https" or parsed.hostname not in self.hosts or parsed.username
++                or parsed.password or port not in (None, 443) or parsed.fragment):
++            raise ConfigurationError("Network requests must use an approved HTTPS provider host.")
++        if self.requests >= self.maximum:
++            raise OnlineSourceError("The request budget was exhausted; no additional requests were made.")
++        delay = self.interval - (time.monotonic() - self.last_request)
++        if delay > 0:
++            time.sleep(delay)
++        self.requests += 1
++        self.last_request = time.monotonic()
++        try:
++            with self.client.stream(method, url, **kwargs) as response:
++                status = response.status_code
++                if status not in allowed_statuses and not 200 <= status < 300:
++                    detail = {
++                        401: "Authentication failed.", 402: "Access or credits are required.",
++                        403: "Access was denied; no bypass was attempted.",
++                        429: "Rate limited; stop and retry later according to the provider's limits.",
++                    }.get(status, "Request failed; redirects and automatic retries are disabled.")
++                    raise OnlineSourceError(f"Provider HTTP {status}. {detail}")
++                parts: list[bytes] = []
++                length = 0
++                for block in response.iter_bytes():
++                    length += len(block)
++                    if length > self.max_bytes:
++                        raise OnlineSourceError("The provider response exceeded max_response_bytes.")
++                    parts.append(block)
++                return status, b"".join(parts).decode("utf-8-sig")
++        except (httpx.HTTPError, UnicodeDecodeError, ValueError):
++            raise OnlineSourceError("Network, TLS, timeout or response-decoding failure; no retry was made.") from None
++
++    def json(self, method: str, url: str, **kwargs: Any) -> Any:
++        _, value = self.request(method, url, **kwargs)
++        try:
++            return json.loads(value, parse_constant=self._invalid_constant)
++        except (ValueError, TypeError, RecursionError):
++            raise OnlineSourceError("Expected JSON, but received an unreadable response or website challenge.") from None
++
++    @staticmethod
++    def _invalid_constant(value: str) -> None:
++        raise ValueError("Invalid JSON constant")
++
++
++class OnlinePlugin:
++    hosts: tuple[str, ...] = ()
++    access = "official-api"
++    interval = 1.0
++
++    def __init__(self, *, transport: Any = None) -> None:
++        self._transport = transport
++
++    def run(self, request: PluginRequest, context: ExecutionContext) -> PluginResult:
++        del context
++        if request.operation not in self.descriptor.operations:
++            raise ConfigurationError(f"{self.descriptor.name} operations: {', '.join(self.descriptor.operations)}.")
++        if request.inputs:
++            raise ConfigurationError("This network plugin accepts --keyword and options, not input files.")
++        if any(key == "llm" or key.startswith("llm_") for key in request.options):
++            raise ConfigurationError("Online source plugins do not use --llm, --model or llm_ options.")
++        limit = integer(request.options, "limit", 50, 1, 1000)
++        timestamp = datetime.now(timezone.utc).isoformat()
++        with HTTP(request.options, self.hosts_for(request), self._transport, self.interval) as http:
++            items, metadata, notes = self.fetch(request, http, timestamp[:10])
++            count = http.requests
++        # Deliberately retain provider ordering and scope. Do not turn scores into demand.
++        metadata = {**metadata, "access": self.access, "retrieved_at": timestamp,
++                    "request_count": count, "rows_received": len(items),
++                    "output_truncated": len(items) > limit,
++                    "completeness": metadata.get("completeness", "provider-limited; not exhaustive")}
++        return PluginResult(self.descriptor.name, request.operation, tuple(items[:limit]),
++                            tuple(notes) + ("Suggestions are not search volume; unavailable data is not zero demand.",),
++                            metadata)
++
++    def hosts_for(self, request: PluginRequest) -> tuple[str, ...]:
++        return self.hosts
++
++    def fetch(self, request: PluginRequest, http: HTTP, observed: str) -> tuple[list[KeywordCandidate], dict, list[str]]:
++        raise NotImplementedError
+diff --git a/src/keywordmoves/online/discovery.py b/src/keywordmoves/online/discovery.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..3ec2fb6b2a76a8d3343a76d3183f88f4d89901db
+--- /dev/null
++++ b/src/keywordmoves/online/discovery.py
+@@ -0,0 +1,167 @@
++"""Official APIs for question discovery, autocomplete and related language."""
++from __future__ import annotations
++
++from ..models import PluginDescriptor
++from .common import (
++    OnlinePlugin,
++    OnlineSourceError,
++    array,
++    boolean,
++    candidate,
++    code,
++    integer,
++    number,
++    obj,
++    phrase,
++    provider_error,
++    secret,
++    seeds,
++)
++
++
++class AlsoAskedPlugin(OnlinePlugin):
++    descriptor = PluginDescriptor("alsoasked", "Discover nested People Also Ask questions through AlsoAsked's API.",
++                                  ("discover", "questions", "official-api"), ("questions",))
++    hosts = ("alsoaskedapi.com", "sandbox.alsoaskedapi.com")
++
++    def fetch(self, request, http, observed):
++        o = request.options
++        terms = seeds(request, 5)
++        region = code(o, "country").lower()
++        language = code(o, "language", "en").lower()
++        body = {"terms": terms, "region": region, "language": language,
++                "depth": integer(o, "depth", 2, 2, 3), "fresh": boolean(o, "fresh"),
++                "async": False, "notify_webhooks": False}
++        host = self.hosts[1] if boolean(o, "sandbox") else self.hosts[0]
++        data = provider_error(http.json("POST", f"https://{host}/v1/search", json=body,
++                                        headers={"X-Api-Key": secret(o, "api_key", "ALSOASKED_API_KEY")}))
++        if data.get("status") != "success":
++            raise OnlineSourceError("AlsoAsked search is not complete/successful. No retry, resubmission or webhook was triggered.")
++        items = []
++        for query in array(data.get("queries")):
++            query = obj(query)
++            term = phrase(query.get("term"))
++            pending = [(row, term, 1) for row in reversed(array(query.get("results")))]
++            while pending:
++                row, parent, depth = pending.pop()
++                row = obj(row)
++                if depth > 10 or len(items) >= 10000:
++                    raise OnlineSourceError("AlsoAsked returned an unexpectedly large or deep question tree.")
++                question = phrase(row.get("question"))
++                items.append(candidate("AlsoAsked", question, {"question_depth": (depth, "tree_level")},
++                                       observed_at=observed, geography=region, relationship="related-question",
++                                       metadata={"seed": term, "parent_question": parent, "language": language},
++                                       note="A People Also Ask relationship, not search volume or popularity."))
++                pending.extend((child, question, depth + 1) for child in reversed(array(row.get("results", []))))
++        return items, {"country": region, "language": language, "sandbox": boolean(o, "sandbox")}, [
++            "Synchronous search only; no webhooks or background polling. Search depth affects credit use.",
++        ]
++
++
++class SerpAPIPlugin(OnlinePlugin):
++    descriptor = PluginDescriptor("serpapi", "Google autocomplete, related searches and questions through SerpApi.",
++                                  ("discover", "questions", "official-api"), ("autocomplete", "related-searches", "questions"))
++    hosts = ("serpapi.com",)
++
++    def fetch(self, request, http, observed):
++        o = request.options
++        seed = seeds(request)[0]
++        country = code(o, "country").lower()
++        language = code(o, "language", "en")
++        autocomplete = request.operation == "autocomplete"
++        params = {"engine": "google_autocomplete" if autocomplete else "google", "q": seed,
++                  "gl": country, "hl": language, "api_key": secret(o, "api_key", "SERPAPI_API_KEY")}
++        data = provider_error(http.json("GET", "https://serpapi.com/search.json", params=params))
++        key, field = {"autocomplete": ("suggestions", "value"),
++                      "related-searches": ("related_searches", "query"),
++                      "questions": ("related_questions", "question")}[request.operation]
++        # Google results may legitimately omit a related-search/question block. For the
++        # autocomplete endpoint a missing suggestions field is not an empty result.
++        if autocomplete and key not in data:
++            raise OnlineSourceError("SerpApi returned no suggestions field; the response schema may have changed.")
++        if obj(data.get("search_metadata") or {}).get("status") != "Success":
++            raise OnlineSourceError("SerpApi did not confirm a successful search.")
++        items = []
++        for index, row in enumerate(array(data.get(key, [])), 1):
++            row = obj(row)
++            items.append(candidate("SerpApi Google", row.get(field), {"returned_order": (index, "ordinal")},
++                                   observed_at=observed, geography=country, relationship=request.operation,
++                                   metadata={"language": language, "seed": seed},
++                                   note="Ordering of a returned search feature, not search volume or organic rank."))
++        return items, {"engine": params["engine"], "country": country, "language": language}, [
++            "SerpApi is a third-party search-data API, not Google's first-party keyword planning service.",
++        ]
++
++
++class BraveSuggestPlugin(OnlinePlugin):
++    descriptor = PluginDescriptor("brave-suggest", "Brave's documented search suggestion API.",
++                                  ("discover", "official-api"), ("suggestions",))
++    hosts = ("api.search.brave.com",)
++
++    def fetch(self, request, http, observed):
++        o = request.options
++        seed = seeds(request)[0]
++        if len(seed.split()) > 50:
++            from .common import ConfigurationError
++            raise ConfigurationError("Brave queries are limited to 50 words.")
++        country = code(o, "country").upper()
++        language = code(o, "language", "en")
++        params = {"q": seed, "country": country, "lang": language,
++                  "count": min(integer(o, "limit", 50, 1, 1000), 20)}
++        data = provider_error(http.json("GET", "https://api.search.brave.com/res/v1/suggest/search",
++                                        params=params, headers={"X-Subscription-Token": secret(o, "api_key", "BRAVE_SEARCH_API_KEY")}))
++        items = [candidate("Brave Suggest API", obj(row).get("query"), {"suggestion_order": (i, "ordinal")},
++                           observed_at=observed, geography=country,
++                           note="Autocomplete order is not a popularity measure.")
++                 for i, row in enumerate(array(data.get("results")), 1)]
++        return items, {"country": country, "language": language}, [
++            "Check your Brave plan's storage rights before retaining results in a permanent register.",
++        ]
++
++
++class DatamusePlugin(OnlinePlugin):
++    descriptor = PluginDescriptor("datamuse", "Datamuse semantic associations, synonyms and word suggestions.",
++                                  ("discover", "related-language", "official-api"), ("related", "synonyms", "suggestions"))
++    hosts = ("api.datamuse.com",)
++
++    def fetch(self, request, http, observed):
++        seed = seeds(request)[0]
++        operation = request.operation
++        parameter = {"related": "ml", "synonyms": "rel_syn", "suggestions": "s"}[operation]
++        route = "sug" if operation == "suggestions" else "words"
++        data = http.json("GET", f"https://api.datamuse.com/{route}",
++                         params={parameter: seed, "max": integer(request.options, "limit", 50, 1, 1000)})
++        items = [candidate("Datamuse", obj(row).get("word"),
++                           {"lexical_match_score": (number(row.get("score")), "provider_rank_score")},
++                           observed_at=observed, relationship=operation,
++                           note="Lexical association score with no search-volume interpretation.") for row in array(data)]
++        return items, {"language": "English"}, [
++            "Related language is not search demand. Attribute Datamuse when displaying its data publicly.",
++            "Datamuse announces API-key requirements from 1 January 2027; this unauthenticated adapter may need updating then.",
++        ]
++
++
++class WikipediaPlugin(OnlinePlugin):
++    descriptor = PluginDescriptor("wikipedia", "MediaWiki OpenSearch topic/title suggestions (not search-volume data).",
++                                  ("discover", "topics", "official-api"), ("suggestions",))
++
++    def hosts_for(self, request):
++        language = code(request.options, "language", "en", r"[a-z]{2,3}(-[a-z]+)?")
++        return (language + ".wikipedia.org",)
++
++    def fetch(self, request, http, observed):
++        host = self.hosts_for(request)[0]
++        data = array(http.json("GET", f"https://{host}/w/api.php", params={
++            "action": "opensearch", "search": seeds(request)[0], "format": "json", "namespace": 0,
++            "limit": min(integer(request.options, "limit", 50, 1, 1000), 500),
++        }))
++        if len(data) != 4:
++            raise OnlineSourceError("Wikipedia returned an unexpected OpenSearch response.")
++        titles, descriptions, urls = array(data[1]), array(data[2]), array(data[3])
++        if not len(titles) == len(descriptions) == len(urls):
++            raise OnlineSourceError("Wikipedia OpenSearch result columns have inconsistent lengths.")
++        items = [candidate("Wikipedia OpenSearch", word, {"suggestion_order": (i + 1, "ordinal")},
++                           observed_at=observed, relationship="related-topic",
++                           metadata={"page_url": urls[i]}, note="Encyclopaedia title suggestion, not keyword demand.")
++                 for i, word in enumerate(titles)]
++        return items, {"language": host.split(".")[0]}, []
+diff --git a/src/keywordmoves/online/google.py b/src/keywordmoves/online/google.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..0f9795b2e8a107ed9c9652cac48f6301582ce979
+--- /dev/null
++++ b/src/keywordmoves/online/google.py
+@@ -0,0 +1,160 @@
++"""Google's first-party keyword planning and property performance APIs."""
++from __future__ import annotations
++
++from urllib.parse import quote
++
++from ..models import PluginDescriptor
++from .common import (
++    ConfigurationError,
++    OnlinePlugin,
++    OnlineSourceError,
++    array,
++    candidate,
++    code,
++    integer,
++    iso_date,
++    number,
++    obj,
++    provider_error,
++    secret,
++    seeds,
++    text,
++)
++
++
++class GoogleAdsPlugin(OnlinePlugin):
++    descriptor = PluginDescriptor(
++        "google-ads", "Google Ads keyword ideas and historical planning metrics (account required).",
++        ("discover", "analyse", "official-api"), ("ideas", "metrics"),
++    )
++    hosts = ("googleads.googleapis.com",)
++
++    def fetch(self, request, http, observed):
++        options = request.options
++        keywords = seeds(request, 20 if request.operation == "ideas" else 100)
++        customer = text(options, "customer_id").replace("-", "")
++        if not customer.isdigit():
++            raise ConfigurationError("customer_id must be numeric, optionally hyphenated.")
++        version = code(options, "api_version", "v25", r"v[0-9]+")
++        locations = text(options, "location_codes").split(",")
++        if not all(v.strip().isdigit() for v in locations) or len(locations) > 10:
++            raise ConfigurationError("location_codes must contain up to 10 comma-separated numeric IDs.")
++        locations = ["geoTargetConstants/" + v.strip() for v in locations]
++        language = code(options, "language_id", "1000", r"[0-9]+")
++        headers = {
++            "Authorization": "Bearer " + secret(options, "access_token", "GOOGLE_ADS_ACCESS_TOKEN"),
++            "developer-token": secret(options, "developer_token", "GOOGLE_ADS_DEVELOPER_TOKEN"),
++        }
++        if "login_customer_id" in options:
++            login = text(options, "login_customer_id").replace("-", "")
++            if not login.isdigit():
++                raise ConfigurationError("login_customer_id must be numeric.")
++            headers["login-customer-id"] = login
++        common = {"language": "languageConstants/" + language,
++                  "geoTargetConstants": locations, "keywordPlanNetwork": "GOOGLE_SEARCH"}
++        limit = integer(options, "limit", 50, 1, 1000)
++        page_size = integer(options, "page_size", limit, 1, 1000)
++        pages = integer(options, "max_pages", 1, 1, 10)
++        suffix = "generateKeywordIdeas" if request.operation == "ideas" else "generateKeywordHistoricalMetrics"
++        url = f"https://{self.hosts[0]}/{version}/customers/{customer}:{suffix}"
++        items, token = [], options.get("page_token")
++        if token is not None:
++            token = text(options, "page_token")
++        for _ in range(pages if request.operation == "ideas" else 1):
++            body = dict(common)
++            if request.operation == "ideas":
++                body.update(keywordSeed={"keywords": keywords}, pageSize=page_size)
++                if token:
++                    body["pageToken"] = token
++            else:
++                body["keywords"] = keywords
++            data = provider_error(http.json("POST", url, headers=headers, json=body))
++            for row in array(data.get("results", [])):
++                row = obj(row)
++                metric_key = "keywordIdeaMetrics" if request.operation == "ideas" else "keywordMetrics"
++                metrics = obj(row.get(metric_key) or {})
++                items.append(candidate("Google Ads API", row.get("text"), {
++                    "avg_monthly_searches": (number(metrics.get("avgMonthlySearches")), "searches_per_month"),
++                    "paid_competition": (metrics.get("competition"), "enum"),
++                    "paid_competition_index": (number(metrics.get("competitionIndex")), "index_0_100"),
++                    "low_top_of_page_bid": (number(metrics.get("lowTopOfPageBidMicros")), "account_currency_micros"),
++                    "high_top_of_page_bid": (number(metrics.get("highTopOfPageBidMicros")), "account_currency_micros"),
++                }, observed_at=observed, geography=",".join(locations),
++                    metadata={"monthly_search_volumes": metrics.get("monthlySearchVolumes", []),
++                              "close_variants": row.get("closeVariants", []), "language_id": language},
++                    note="Planning estimates and close-variant aggregation, not exact demand or organic difficulty."))
++            token = data.get("nextPageToken")
++            if token is not None and not isinstance(token, str):
++                raise OnlineSourceError("Google Ads returned an invalid pagination token.")
++            if not token or len(items) >= limit:
++                break
++        return items, {"api_version": version, "next_page_token": token,
++                       "language_id": language, "location_codes": locations}, [
++            "Uses a read-only planning operation; no campaigns are created.",
++            "OAuth access tokens must be renewed externally. Bid units use the Ads account currency.",
++        ]
++
++
++class SearchConsolePlugin(OnlinePlugin):
++    descriptor = PluginDescriptor(
++        "search-console", "Query clicks, impressions and positions for an authorised Search Console property.",
++        ("analyse", "first-party", "official-api"), ("queries",),
++    )
++    hosts = ("www.googleapis.com",)
++
++    def fetch(self, request, http, observed):
++        options = request.options
++        site = text(options, "site_url")
++        if not (site.startswith("https://") or site.startswith("http://") or site.startswith("sc-domain:")):
++            raise ConfigurationError("site_url must identify an exact URL-prefix or sc-domain property.")
++        start, end = iso_date(options, "start_date"), iso_date(options, "end_date")
++        if start > end:
++            raise ConfigurationError("start_date must be on or before end_date.")
++        from .common import choice
++
++        search_type = choice(options, "search_type", "web", ("web", "image", "video", "news"))
++        limit = integer(options, "limit", 50, 1, 1000)
++        page_size = integer(options, "page_size", limit, 1, 1000)
++        offset = integer(options, "start_row", 0, 0, 1_000_000)
++        pages = integer(options, "max_pages", 1, 1, 10)
++        headers = {"Authorization": "Bearer " + secret(options, "access_token", "SEARCH_CONSOLE_ACCESS_TOKEN")}
++        body = {"startDate": start, "endDate": end, "dimensions": ["query"],
++                "type": search_type, "dataState": "final"}
++        filters = []
++        if request.keywords:
++            filters.append({"dimension": "query", "operator": "contains", "expression": seeds(request)[0]})
++        country = None
++        if "country" in options:
++            country = code(options, "country", pattern=r"[A-Za-z]{3}").lower()
++            filters.append({"dimension": "country", "operator": "equals", "expression": country})
++        if filters:
++            body["dimensionFilterGroups"] = [{"groupType": "and", "filters": filters}]
++        url = f"https://www.googleapis.com/webmasters/v3/sites/{quote(site, safe='')}/searchAnalytics/query"
++        items, more = [], False
++        for _ in range(pages):
++            data = provider_error(http.json("POST", url, headers=headers,
++                                            json={**body, "rowLimit": page_size, "startRow": offset}))
++            rows = array(data.get("rows", []))
++            for row in rows:
++                row = obj(row)
++                keys = array(row.get("keys"))
++                if len(keys) != 1:
++                    raise OnlineSourceError("Search Console returned unexpected query dimensions.")
++                items.append(candidate("Google Search Console", keys[0], {
++                    "clicks": (number(row.get("clicks")), "count"),
++                    "impressions": (number(row.get("impressions")), "count"),
++                    "ctr": (number(row.get("ctr")), "fraction_0_1"),
++                    "average_position": (number(row.get("position")), "position"),
++                }, observed_at=observed, geography=country, relationship="observed-query",
++                    metadata={"site_url": site, "start_date": start, "end_date": end,
++                              "date_timezone": "America/Los_Angeles", "search_type": search_type},
++                    note="Performance on the authorised property, not total market searches."))
++            offset += len(rows)
++            more = len(rows) == page_size
++            if not more or len(items) >= limit:
++                break
++        return items, {"site_url": site, "start_date": start, "end_date": end,
++                       "next_start_row": offset if more else None}, [
++            "Dates use Search Console's Pacific-time boundaries; anonymised queries and other rows may be omitted.",
++            "Pagination does not make this API an exhaustive query export.",
++        ]
+diff --git a/src/keywordmoves/online/websites.py b/src/keywordmoves/online/websites.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..f44e0fab2cea2b65d57a787bb5b0d0f051b8a585
+--- /dev/null
++++ b/src/keywordmoves/online/websites.py
+@@ -0,0 +1,299 @@
++"""Explicit, low-rate public-web access; no cookies, login automation or challenge bypass."""
++from __future__ import annotations
++
++import csv
++import io
++import ipaddress
++import re
++import socket
++from datetime import datetime, timezone
++from pathlib import Path
++from urllib.parse import quote_plus, urlsplit, urlunsplit
++from urllib.robotparser import RobotFileParser
++
++from ..errors import ConfigurationError, InputError
++from ..models import PluginDescriptor, PluginResult
++from .common import (
++    HTTP,
++    USER_AGENT,
++    OnlinePlugin,
++    OnlineSourceError,
++    array,
++    boolean,
++    candidate,
++    choice,
++    code,
++    integer,
++    iso_date,
++    number,
++    seeds,
++    text,
++)
++
++
++def public_url(url: str) -> str:
++    """Reject non-public destinations before a user-configured website request.
++
++    This is a local CLI safeguard, not a hardened server-side URL proxy: deployments
++    accepting untrusted URLs also need network-level egress controls against DNS rebinding.
++    """
++    try:
++        parsed = urlsplit(url)
++        if (parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password
++                or parsed.port not in (None, 443) or parsed.fragment):
++            raise ValueError
++        host = parsed.hostname
++        if "." not in host or host.endswith((".local", ".internal", ".localhost")):
++            raise ValueError
++        addresses = socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)
++        if not addresses or any(not ipaddress.ip_address(row[4][0]).is_global for row in addresses):
++            raise ValueError
++    except (ValueError, OSError):
++        raise ConfigurationError("Website URLs must resolve to public HTTPS destinations without credentials or fragments.") from None
++    return host
++
++
++def check_robots(http: HTTP, url: str) -> None:
++    parsed = urlsplit(url)
++    robots_url = urlunsplit((parsed.scheme, parsed.netloc, "/robots.txt", "", ""))
++    status, body = http.request("GET", robots_url, allowed_statuses=(404, 410))
++    if status in (404, 410):
++        return
++    # A CAPTCHA or HTML error page must not be interpreted as an empty allow-all file.
++    if "<html" in body.lower() or "<!doctype html" in body.lower():
++        raise OnlineSourceError("The robots policy could not be read reliably; website access stopped.")
++    parser = RobotFileParser()
++    parser.parse(body.splitlines())
++    if not parser.can_fetch(USER_AGENT, url):
++        raise OnlineSourceError("The website's robots policy disallows this request; no override is provided.")
++    delay = parser.crawl_delay(USER_AGENT) or parser.crawl_delay("*")
++    rate = parser.request_rate(USER_AGENT) or parser.request_rate("*")
++    if rate and rate.requests:
++        delay = max(delay or 0, rate.seconds / rate.requests)
++    if delay:
++        if delay > 60:
++            raise OnlineSourceError("The website requests a crawl delay over 60 seconds; use an export instead.")
++        http.interval = max(http.interval, delay)
++
++
++class WebAutocompletePlugin(OnlinePlugin):
++    access = "unofficial-web-endpoint"
++    interval = 2.0
++    endpoint = ""
++
++    def fetch(self, request, http, observed):
++        o = request.options
++        if not boolean(o, "allow_unofficial"):
++            raise ConfigurationError("This is an unsupported website-client endpoint. Set allow_unofficial=true after reviewing provider rules.")
++        query = seeds(request)[0]
++        if self.descriptor.name == "google-autocomplete":
++            params = {"client": "firefox", "q": query, "hl": code(o, "language", "en")}
++        elif self.descriptor.name == "bing-autocomplete":
++            params = {"query": query}
++        else:
++            params = {"q": query, "type": "list"}
++        # Include the actual query when evaluating robots rules.
++        from urllib.parse import urlencode
++        check_robots(http, self.endpoint + "?" + urlencode(params))
++        data = array(http.json("GET", self.endpoint, params=params))
++        if len(data) < 2 or not isinstance(data[0], str):
++            raise OnlineSourceError("The website autocomplete response schema changed.")
++        results = array(data[1])
++        items = [candidate(self.descriptor.name, value, {"suggestion_order": (index, "ordinal")},
++                           observed_at=observed, note="Experimental website autocomplete; not a supported keyword-volume API.")
++                 for index, value in enumerate(results, 1)]
++        return items, {"language": params.get("hl"), "country": None}, [
++            "Endpoint identified in public browser source, not an official developer contract. It may stop working without notice.",
++            "No region-specific demand inference; there is no automatic fallback after blocking or format changes.",
++        ]
++
++
++class GoogleAutocompletePlugin(WebAutocompletePlugin):
++    descriptor = PluginDescriptor("google-autocomplete", "Experimental Google browser suggestions; explicit opt-in required.",
++                                  ("discover", "experimental-web"), ("suggestions",))
++    hosts = ("suggestqueries.google.com",)
++    endpoint = "https://suggestqueries.google.com/complete/search"
++
++
++class BingAutocompletePlugin(WebAutocompletePlugin):
++    descriptor = PluginDescriptor("bing-autocomplete", "Experimental Bing browser suggestions; explicit opt-in required.",
++                                  ("discover", "experimental-web"), ("suggestions",))
++    hosts = ("api.bing.com",)
++    endpoint = "https://api.bing.com/osjson.aspx"
++
++
++class DuckDuckGoAutocompletePlugin(WebAutocompletePlugin):
++    descriptor = PluginDescriptor("duckduckgo-autocomplete", "Experimental DuckDuckGo browser suggestions; explicit opt-in required.",
++                                  ("discover", "experimental-web"), ("suggestions",))
++    hosts = ("ac.duckduckgo.com",)
++    endpoint = "https://ac.duckduckgo.com/ac/"
++
++
++def read_file(request) -> str:
++    if len(request.inputs) != 1:
++        raise ConfigurationError("Supply exactly one --input file for this import operation.")
++    path = Path(request.inputs[0])
++    maximum = integer(request.options, "max_response_bytes", 2_000_000, 1024, 10_000_000)
++    try:
++        with path.open("rb") as stream:
++            data = stream.read(maximum + 1)
++        if len(data) > maximum:
++            raise InputError("Input file exceeds max_response_bytes.")
++        return data.decode("utf-8-sig")
++    except (OSError, UnicodeDecodeError):
++        raise InputError("The input file must be a readable UTF-8 CSV or HTML file.") from None
++
++
++def parse_html(body: str, options, source: str, observed: str, source_url: str | None):
++    try:
++        from bs4 import BeautifulSoup
++        from soupsieve.util import SelectorSyntaxError
++    except ImportError:
++        raise ConfigurationError("HTML extraction needs: pip install 'keywordmoves[online]'.") from None
++    soup = BeautifulSoup(body, "html.parser")
++    title = soup.title.get_text(" ", strip=True).lower() if soup.title else ""
++    challenge = soup.select_one(".g-recaptcha, .h-captcha, #challenge-form, input[type=password]")
++    if challenge or any(token in title for token in ("access denied", "verify you are", "just a moment", "sign in", "log in", "captcha")):
++        raise OnlineSourceError("The page is a login/access challenge, not keyword results; extraction stopped.")
++    for tag in soup.select("script, style, template"):
++        tag.decompose()
++    selector = text(options, "selector")
++    try:
++        nodes = soup.select(selector)
++        empty = soup.select(text(options, "empty_selector")) if "empty_selector" in options else []
++    except SelectorSyntaxError:
++        raise ConfigurationError("The configured CSS selector is invalid.") from None
++    if not nodes:
++        if empty:
++            return [], ["The explicitly configured no-results marker was present."]
++        raise OnlineSourceError("No keyword elements matched. The layout may have changed or require JavaScript; this is not a zero-result claim.")
++    words, seen = [], set()
++    for node in nodes:
++        # Do not collect content from explicitly hidden DOM elements.
++        if any(parent.has_attr("hidden") or parent.get("aria-hidden") == "true" or
++               "display:none" in parent.get("style", "").replace(" ", "").lower()
++               for parent in [node, *node.parents] if getattr(parent, "attrs", None) is not None):
++            continue
++        word = " ".join(node.stripped_strings)
++        if word and word.casefold() not in seen:
++            seen.add(word.casefold())
++            words.append(word)
++    if not words:
++        raise OnlineSourceError("Matched elements contained no visible keyword text.")
++    items = [candidate(source, word, {"returned_order": (i, "ordinal")}, observed_at=observed,
++                       geography=options.get("country"), metadata={"source_url": source_url},
++                       note="Text extracted using an explicitly selected DOM rule; no volume is inferred.")
++             for i, word in enumerate(words, 1)]
++    return items, []
++
++
++class WebsiteKeywordsPlugin(OnlinePlugin):
++    descriptor = PluginDescriptor("website-keywords", "Public HTML query/extraction with reviewed URL and CSS rules; or saved DOM import.",
++                                  ("discover", "public-html", "import"), ("query", "import-html"))
++    access = "public-html"
++
++    def run(self, request, context):
++        if request.operation == "import-html":
++            observed = iso_date(request.options, "observed_at")
++            items, notes = parse_html(read_file(request), request.options, "Saved website HTML", observed,
++                                      request.options.get("source_url"))
++            limit = integer(request.options, "limit", 50, 1, 1000)
++            return PluginResult(self.descriptor.name, request.operation, tuple(items[:limit]), tuple(notes),
++                                {"access": "saved-html", "output_truncated": len(items) > limit,
++                                 "live_query_performed": False, "source_file": str(request.inputs[0])})
++        return super().run(request, context)
++
++    def _url(self, request):
++        template = text(request.options, "url_template")
++        if template.count("{query}") != 1 or "{query}" not in urlsplit(template).query:
++            raise ConfigurationError("url_template must have one {query} placeholder in its query string, not host or path.")
++        result = template.replace("{query}", quote_plus(seeds(request)[0]))
++        if "{" in result or "}" in result:
++            raise ConfigurationError("Unexpected template placeholder.")
++        return result
++
++    def hosts_for(self, request):
++        return (public_url(self._url(request)),)
++
++    def fetch(self, request, http, observed):
++        url = self._url(request)
++        # Validate the selector before making any network request.
++        text(request.options, "selector")
++        check_robots(http, url)
++        public_url(url)
++        _, body = http.request("GET", url)
++        items, notes = parse_html(body, request.options, "Public website HTML", observed, url)
++        return items, {"source_url": url}, notes + [
++            "Static public HTML only. No login, JavaScript execution, cookies supplied by the user, or CAPTCHA bypass.",
++            "The URL template and selectors are user-reviewed configuration, not verified built-in recipes for every website.",
++        ]
++
++
++class ExportPlugin:
++    """Honest report adapters for tools without a verified public live-query contract."""
++    source = ""
++
++    def run(self, request, context):
++        del context
++        if request.operation not in self.descriptor.operations:
++            raise ConfigurationError(f"{self.descriptor.name} supports import-csv and import-html, not live website queries.")
++        if request.keywords:
++            raise ConfigurationError("Report import operations do not query or filter --keyword seeds.")
++        o = request.options
++        observed = iso_date(o, "observed_at")
++        platform = text(o, "platform")
++        limit = integer(o, "limit", 50, 1, 1000)
++        body = read_file(request)
++        if request.operation == "import-html":
++            items, notes = parse_html(body, o, self.source + " saved HTML", observed, o.get("source_url"))
++        else:
++            items, notes = self._csv(body, o, observed, platform)
++        return PluginResult(self.descriptor.name, request.operation, tuple(items[:limit]), tuple(notes),
++                            {"access": "user-export", "live_query_performed": False,
++                             "platform": platform, "source_file": str(request.inputs[0]),
++                             "output_truncated": len(items) > limit,
++                             "retrieved_at": datetime.now(timezone.utc).isoformat()})
++
++    def _csv(self, body, o, observed, platform):
++        delimiter = choice(o, "delimiter", ",", (",", ";", "tab"))
++        reader = csv.DictReader(io.StringIO(body), delimiter="\t" if delimiter == "tab" else delimiter)
++        phrase_column = text(o, "phrase_column")
++        maps = {"volume_column": ("reported_search_volume", "searches_per_month"),
++                "difficulty_column": ("reported_organic_difficulty", "provider_index"),
++                "cpc_column": ("reported_cpc", text(o, "currency") if "cpc_column" in o else "")}
++        selected = {text(o, key): (metric, unit) for key, (metric, unit) in maps.items() if key in o}
++        if not {phrase_column, *selected}.issubset(set(reader.fieldnames or [])):
++            raise InputError("Configured export column names are missing; verify the delimiter and exact headings.")
++        items = []
++        for index, row in enumerate(reader, 1):
++            if None in row or any(value is None for value in row.values()):
++                raise InputError("The exported CSV contains inconsistent column counts.")
++            if not any(row.values()):
++                continue
++            values = {"export_order": (index, "ordinal")}
++            for column, (metric, unit) in selected.items():
++                raw = row[column].strip()
++                if raw.casefold() in {"", "n/a", "null", "-"}:
++                    value = None
++                else:
++                    if "," in raw and not re.fullmatch(r"[+-]?[0-9]{1,3}(?:,[0-9]{3})+(?:\.[0-9]+)?", raw):
++                        raise InputError("Ambiguous numeric locale in export; use dot decimals and valid comma thousands groups.")
++                    value = number(raw.replace(",", ""))
++                values[metric] = (value, unit)
++            items.append(candidate(self.source + " user export", row[phrase_column], values,
++                                   observed_at=observed, geography=o.get("country"),
++                                   metadata={"platform": platform},
++                                   note="User-supplied report with explicit column mapping, not a live verified API response."))
++        return items, ["Column meanings, units, locale and observation date must match the report you exported."]
++
++
++class UbersuggestPlugin(ExportPlugin):
++    source = "Ubersuggest"
++    descriptor = PluginDescriptor("ubersuggest", "Import Ubersuggest CSV or rendered HTML; no public API/live scraper is verified.",
++                                  ("import", "user-export"), ("import-csv", "import-html"))
++
++
++class AnswerThePublicPlugin(ExportPlugin):
++    source = "AnswerThePublic"
++    descriptor = PluginDescriptor("answerthepublic", "Import AnswerThePublic CSV or rendered HTML with explicit extraction rules.",
++                                  ("import", "user-export"), ("import-csv", "import-html"))
+diff --git a/src/keywordmoves/registry.py b/src/keywordmoves/registry.py
+index 3cd1e46eaed9c26db1b3d6430c315f680cb78b93..9fa0d332454d6dc67986d3af2a61a8e810b24a8e 100644
+--- a/src/keywordmoves/registry.py
++++ b/src/keywordmoves/registry.py
+@@ -52,6 +52,7 @@ def _keyword_builtins() -> dict[str, Callable[[], Any]]:
+     from .builtin.observed_evidence import ObservedEvidencePlugin
+     from .builtin.spacy_keywords import SpacyKeywordPlugin
+     from .builtin.text_library import TextLibraryPlugin
++    from .online import factories as online_factories
+ 
+     return {
+         "google-trends": GoogleTrendsPlugin,
+@@ -60,6 +61,7 @@ def _keyword_builtins() -> dict[str, Callable[[], Any]]:
+         "observed-evidence": ObservedEvidencePlugin,
+         "spacy": SpacyKeywordPlugin,
+         "text-library": TextLibraryPlugin,
++        **online_factories(),
+     }
+ 
+ 
+diff --git a/tests/fixtures/online/README.md b/tests/fixtures/online/README.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..89fbb925c5496d24672350227b1f302e142089a4
+--- /dev/null
++++ b/tests/fixtures/online/README.md
+@@ -0,0 +1,6 @@
++# Offline contract fixtures
++
++All responses in this directory are **synthetic**, authored to exercise the documented
++response shapes listed in `docs/online-sources.md`. They are not downloaded provider
++results, real volume observations, or demonstrations of live subscription access.
++Tests use real HTTPX request serialization and MockTransport, not a live network.
+diff --git a/tests/fixtures/online/ahrefs.json b/tests/fixtures/online/ahrefs.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..69ddd5548deddb57a0a02cab119fd07df363b797
+--- /dev/null
++++ b/tests/fixtures/online/ahrefs.json
+@@ -0,0 +1,10 @@
++{
++  "keywords": [
++    {
++      "keyword": "paper planes",
++      "volume": 400,
++      "difficulty": 12,
++      "cpc": 123
++    }
++  ]
++}
+diff --git a/tests/fixtures/online/alsoasked.json b/tests/fixtures/online/alsoasked.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..e3f8baeef9cb2e31bd8834d34b170a824b49dbd0
+--- /dev/null
++++ b/tests/fixtures/online/alsoasked.json
+@@ -0,0 +1,19 @@
++{
++  "status": "success",
++  "queries": [
++    {
++      "term": "paper planes",
++      "results": [
++        {
++          "question": "How do paper planes fly?",
++          "results": [
++            {
++              "question": "What is lift?",
++              "results": []
++            }
++          ]
++        }
++      ]
++    }
++  ]
++}
+diff --git a/tests/fixtures/online/autocomplete.json b/tests/fixtures/online/autocomplete.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..9b2a82794f5f9bfe3991300c33d46ce13f00e554
+--- /dev/null
++++ b/tests/fixtures/online/autocomplete.json
+@@ -0,0 +1,9 @@
++[
++  "paper",
++  [
++    "paper planes",
++    "paper folding"
++  ],
++  [],
++  {}
++]
+diff --git a/tests/fixtures/online/brave.json b/tests/fixtures/online/brave.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..5ff2ae45e2c0e90620e35d66c767cefcbaec0aaf
+--- /dev/null
++++ b/tests/fixtures/online/brave.json
+@@ -0,0 +1,11 @@
++{
++  "type": "suggest",
++  "query": {
++    "original": "paper"
++  },
++  "results": [
++    {
++      "query": "paper planes"
++    }
++  ]
++}
+diff --git a/tests/fixtures/online/dataforseo.json b/tests/fixtures/online/dataforseo.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..dfe9579084ff0d87c2ce4699a9c7f592f6b9e81b
+--- /dev/null
++++ b/tests/fixtures/online/dataforseo.json
+@@ -0,0 +1,35 @@
++{
++  "status_code": 20000,
++  "cost": 0.01,
++  "tasks": [
++    {
++      "status_code": 20000,
++      "result": [
++        {
++          "total_count": 1,
++          "items": [
++            {
++              "keyword": "paper planes",
++              "keyword_info": {
++                "search_volume": 100,
++                "cpc": 0,
++                "competition": null,
++                "last_updated_time": "2026-09-15",
++                "monthly_searches": [
++                  {
++                    "year": 2026,
++                    "month": 8,
++                    "search_volume": 90
++                  }
++                ]
++              },
++              "keyword_properties": {
++                "keyword_difficulty": 18
++              }
++            }
++          ]
++        }
++      ]
++    }
++  ]
++}
+diff --git a/tests/fixtures/online/datamuse.json b/tests/fixtures/online/datamuse.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..2f8f7960e68d2908aab1c43edcc0630ebdc42175
+--- /dev/null
++++ b/tests/fixtures/online/datamuse.json
+@@ -0,0 +1,6 @@
++[
++  {
++    "word": "paper planes",
++    "score": 512.4
++  }
++]
+diff --git a/tests/fixtures/online/export.csv b/tests/fixtures/online/export.csv
+new file mode 100644
+index 0000000000000000000000000000000000000000..28dc384157db6cd757f5e3a5532173b8514615b8
+--- /dev/null
++++ b/tests/fixtures/online/export.csv
+@@ -0,0 +1,3 @@
++Keyword,Volume,CPC,Difficulty
++paper planes,0,1.25,12
++paper folding,N/A,,
+diff --git a/tests/fixtures/online/google_ads_ideas.json b/tests/fixtures/online/google_ads_ideas.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..513e3534d44298d600c7c9af328f969b603db710
+--- /dev/null
++++ b/tests/fixtures/online/google_ads_ideas.json
+@@ -0,0 +1,21 @@
++{
++  "results": [
++    {
++      "text": "paper planes",
++      "keywordIdeaMetrics": {
++        "avgMonthlySearches": "0",
++        "competition": "LOW",
++        "competitionIndex": "12",
++        "lowTopOfPageBidMicros": "123000",
++        "highTopOfPageBidMicros": null,
++        "monthlySearchVolumes": [
++          {
++            "year": "2026",
++            "month": "AUGUST",
++            "monthlySearches": "20"
++          }
++        ]
++      }
++    }
++  ]
++}
+diff --git a/tests/fixtures/online/google_ads_metrics.json b/tests/fixtures/online/google_ads_metrics.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..2d1f2b7ebe9967266b87eb1c25765140a016d058
+--- /dev/null
++++ b/tests/fixtures/online/google_ads_metrics.json
+@@ -0,0 +1,14 @@
++{
++  "results": [
++    {
++      "text": "paper planes",
++      "closeVariants": [
++        "paper plane"
++      ],
++      "keywordMetrics": {
++        "avgMonthlySearches": "240",
++        "competition": "MEDIUM"
++      }
++    }
++  ]
++}
+diff --git a/tests/fixtures/online/keywords_everywhere.json b/tests/fixtures/online/keywords_everywhere.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..ac15f1523439d5a4f2543b3e97be666f35aa86f3
+--- /dev/null
++++ b/tests/fixtures/online/keywords_everywhere.json
+@@ -0,0 +1,15 @@
++{
++  "data": [
++    {
++      "keyword": "paper planes",
++      "vol": 100,
++      "cpc": {
++        "currency": "$",
++        "value": "0.53"
++      },
++      "competition": 0.0,
++      "trend": []
++    }
++  ],
++  "credits_consumed": 1
++}
+diff --git a/tests/fixtures/online/keywordtool.json b/tests/fixtures/online/keywordtool.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..5cdde899a91945632fc38f859d99a3cd705e1a43
+--- /dev/null
++++ b/tests/fixtures/online/keywordtool.json
+@@ -0,0 +1,14 @@
++{
++  "results": {
++    "paper planes": {
++      "string": "paper planes",
++      "volume": 500,
++      "cpc": 0.42,
++      "cmp": 0.1,
++      "m1": 450,
++      "m1_month": 8,
++      "m1_year": 2026
++    }
++  },
++  "total_keywords": 1
++}
+diff --git a/tests/fixtures/online/results.html b/tests/fixtures/online/results.html
+new file mode 100644
+index 0000000000000000000000000000000000000000..b99573ae7969a6bbf3f7aa0e4bdca4dc1a0f7fc2
+--- /dev/null
++++ b/tests/fixtures/online/results.html
+@@ -0,0 +1,4 @@
++<!doctype html><html><head><title>Keyword results</title></head><body>
++<div class="result">Paper planes</div><div class="result">Paper folding</div>
++<div class="result">paper planes</div><div hidden><div class="result">Hidden keyword</div></div>
++<script>fakeKeyword = "do not import";</script></body></html>
+diff --git a/tests/fixtures/online/search_console.json b/tests/fixtures/online/search_console.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..bc3b932d1a397c7a70ff3a00bdc8edfe1f024cc4
+--- /dev/null
++++ b/tests/fixtures/online/search_console.json
+@@ -0,0 +1,14 @@
++{
++  "rows": [
++    {
++      "keys": [
++        "paper planes"
++      ],
++      "clicks": 3,
++      "impressions": 30,
++      "ctr": 0.1,
++      "position": 4.2
++    }
++  ],
++  "responseAggregationType": "byProperty"
++}
+diff --git a/tests/fixtures/online/semrush.csv b/tests/fixtures/online/semrush.csv
+new file mode 100644
+index 0000000000000000000000000000000000000000..ff2dc51d18c7db92684feb636ee105fd4af8c9cb
+--- /dev/null
++++ b/tests/fixtures/online/semrush.csv
+@@ -0,0 +1,2 @@
++Keyword;Search Volume;CPC;Competition
++paper planes;300;0.32;0.12
+diff --git a/tests/fixtures/online/serpapi_autocomplete.json b/tests/fixtures/online/serpapi_autocomplete.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..ab414c90f58d51daf3053e9f25bc45f4cd4a0ce5
+--- /dev/null
++++ b/tests/fixtures/online/serpapi_autocomplete.json
+@@ -0,0 +1,10 @@
++{
++  "suggestions": [
++    {
++      "value": "paper planes song"
++    }
++  ],
++  "search_metadata": {
++    "status": "Success"
++  }
++}
+diff --git a/tests/fixtures/online/serpapi_questions.json b/tests/fixtures/online/serpapi_questions.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..ace5db40cccb8a7ee5d88f0c9311a0a7abc8ea0b
+--- /dev/null
++++ b/tests/fixtures/online/serpapi_questions.json
+@@ -0,0 +1,10 @@
++{
++  "related_questions": [
++    {
++      "question": "How do paper planes fly?"
++    }
++  ],
++  "search_metadata": {
++    "status": "Success"
++  }
++}
+diff --git a/tests/fixtures/online/serpapi_related.json b/tests/fixtures/online/serpapi_related.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..9b45729fb4984be9756b892332f82afe05b3db79
+--- /dev/null
++++ b/tests/fixtures/online/serpapi_related.json
+@@ -0,0 +1,10 @@
++{
++  "related_searches": [
++    {
++      "query": "paper planes song"
++    }
++  ],
++  "search_metadata": {
++    "status": "Success"
++  }
++}
+diff --git a/tests/fixtures/online/wikipedia.json b/tests/fixtures/online/wikipedia.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..608a40c78dd3facf7a0cf0663fe462f0d441f728
+--- /dev/null
++++ b/tests/fixtures/online/wikipedia.json
+@@ -0,0 +1,12 @@
++[
++  "paper",
++  [
++    "Paper plane"
++  ],
++  [
++    ""
++  ],
++  [
++    "https://en.wikipedia.org/wiki/Paper_plane"
++  ]
++]
+diff --git a/tests/test_nltk_config.py b/tests/test_nltk_config.py
+index 170191768de389d650e6685938a56aabe9eb9937..4eeb1fd62106adba71d3f05949e21d35127fa711 100644
+--- a/tests/test_nltk_config.py
++++ b/tests/test_nltk_config.py
+@@ -150,6 +150,6 @@ raise SystemExit(main(["plugins", "--json"]))
+                             env={**os.environ, "PYTHONPATH": str(root / "src")},
+                             text=True, capture_output=True, check=True)
+     items = json.loads(result.stdout)
+-    assert {item["name"] for item in items if item["kind"] == "keyword"} == {
++    assert {item["name"] for item in items if item["kind"] == "keyword"} >= {
+         "google-trends", "keybert", "observed-evidence", "nltk", "spacy", "text-library",
+     }
+diff --git a/tests/test_online_api.py b/tests/test_online_api.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..4510b99ca3502d55f156cd6cd1a95e11700738be
+--- /dev/null
++++ b/tests/test_online_api.py
+@@ -0,0 +1,292 @@
++"""Provider contract tests with real HTTPX serialization and synthetic responses."""
++from __future__ import annotations
++
++import json
++from pathlib import Path
++from urllib.parse import parse_qs
++
++import pytest
++
++from keywordmoves.models import ExecutionContext, PluginRequest
++from keywordmoves.online import factories
++from keywordmoves.online.common import ConfigurationError, OnlineSourceError
++
++httpx = pytest.importorskip("httpx")
++
++FIXTURES = Path(__file__).parent / "fixtures" / "online"
++CREDENTIALS = {
++    "GOOGLE_ADS_ACCESS_TOKEN": "secret-access", "GOOGLE_ADS_DEVELOPER_TOKEN": "secret-developer",
++    "SEARCH_CONSOLE_ACCESS_TOKEN": "secret-console", "DATAFORSEO_LOGIN": "secret-login",
++    "DATAFORSEO_PASSWORD": "secret-password", "SEMRUSH_API_KEY": "secret-semrush",
++    "AHREFS_API_KEY": "secret-ahrefs", "KEYWORDTOOL_API_KEY": "secret-keywordtool",
++    "KEYWORDS_EVERYWHERE_API_KEY": "secret-everywhere", "ALSOASKED_API_KEY": "secret-alsoasked",
++    "SERPAPI_API_KEY": "secret-serpapi", "BRAVE_SEARCH_API_KEY": "secret-brave",
++}
++
++# Every official API operation is covered, including the different payload key names.
++CASES = [
++    ("google-ads", "ideas", "google_ads_ideas", {"customer_id":"123-456-7890", "location_codes":"2826"}, "googleads.googleapis.com", "/v25/customers/1234567890:generateKeywordIdeas"),
++    ("google-ads", "metrics", "google_ads_metrics", {"customer_id":"1234567890", "location_codes":"2826"}, "googleads.googleapis.com", "/v25/customers/1234567890:generateKeywordHistoricalMetrics"),
++    ("search-console", "queries", "search_console", {"site_url":"https://example.org/", "start_date":"2026-09-01", "end_date":"2026-09-30"}, "www.googleapis.com", "/webmasters/v3/sites/https://example.org//searchAnalytics/query"),
++    *[("dataforseo", op, "dataforseo", {"location_code":2826}, "api.dataforseo.com", f"/v3/dataforseo_labs/google/{route}/live") for op,route in [("ideas","keyword_ideas"),("suggestions","keyword_suggestions"),("metrics","keyword_overview")]],
++    *[("semrush", op, "semrush", {"database":"uk"}, "api.semrush.com", "/") for op in ("related","broad-match","metrics")],
++    *[("ahrefs", op, "ahrefs", {"country":"gb"}, "api.ahrefs.com", "/v3/keywords-explorer/matching-terms") for op in ("matching-terms","questions")],
++    ("keywordtool", "suggestions", "keywordtool", {"country":"GB"}, "api.keywordtool.io", "/v2/search/suggestions/google"),
++    ("keywordtool", "metrics", "keywordtool", {"location_code":2826}, "api.keywordtool.io", "/v2/search/volume/google"),
++    ("keywords-everywhere", "metrics", "keywords_everywhere", {"country":"gb"}, "api.keywordseverywhere.com", "/v1/get_keyword_data"),
++    ("alsoasked", "questions", "alsoasked", {"country":"gb"}, "alsoaskedapi.com", "/v1/search"),
++    ("serpapi", "autocomplete", "serpapi_autocomplete", {"country":"uk"}, "serpapi.com", "/search.json"),
++    ("serpapi", "questions", "serpapi_questions", {"country":"uk"}, "serpapi.com", "/search.json"),
++    ("serpapi", "related-searches", "serpapi_related", {"country":"uk"}, "serpapi.com", "/search.json"),
++    ("brave-suggest", "suggestions", "brave", {"country":"GB"}, "api.search.brave.com", "/res/v1/suggest/search"),
++    *[("datamuse", op, "datamuse", {}, "api.datamuse.com", "/sug" if op == "suggestions" else "/words") for op in ("related","synonyms","suggestions")],
++    ("wikipedia", "suggestions", "wikipedia", {}, "en.wikipedia.org", "/w/api.php"),
++]
++
++
++@pytest.fixture(autouse=True)
++def environment(monkeypatch):
++    for key, value in CREDENTIALS.items():
++        monkeypatch.setenv(key, value)
++    monkeypatch.setattr("keywordmoves.online.common.time.sleep", lambda _: None)
++
++
++def response_for(name):
++    path = FIXTURES / (name + (".csv" if name == "semrush" else ".json"))
++    return httpx.Response(200, content=path.read_bytes())
++
++
++def call(name, operation, options, handler, keywords=("paper planes",)):
++    plugin = factories()[name](transport=httpx.MockTransport(handler))
++    return plugin.run(PluginRequest(operation, keywords=keywords, options=options), ExecutionContext(None))
++
++
++@pytest.mark.parametrize("name,operation,fixture,options,host,path", CASES)
++def test_all_documented_api_operations(name, operation, fixture, options, host, path):
++    sent = []
++
++    def handler(request):
++        sent.append(request)
++        assert request.url.host == host
++        assert request.url.path == path
++        assert request.url.scheme == "https"
++        assert "KeywordMoves" in request.headers["User-Agent"]
++        return response_for(fixture)
++
++    result = call(name, operation, options, handler)
++    assert result.keywords
++    assert result.metadata["access"] == "official-api"
++    assert result.metadata["request_count"] == 1
++    assert all(k.score is None for k in result.keywords)
++    serialized = json.dumps(result.to_dict())
++    assert all(value not in serialized for value in CREDENTIALS.values())
++    assert all(e.observed_at for k in result.keywords for e in k.evidence)
++    assert len(sent) == 1
++    req = sent[0]
++    payload = json.loads(req.content) if req.headers.get("content-type", "").startswith("application/json") else None
++    if name == "google-ads":
++        assert req.headers["developer-token"] == "secret-developer"
++        assert req.headers["Authorization"] == "Bearer secret-access"
++        assert payload["geoTargetConstants"] == ["geoTargetConstants/2826"]
++        assert (payload["keywordSeed"]["keywords"] if operation == "ideas" else payload["keywords"]) == ["paper planes"]
++    elif name == "search-console":
++        assert "%3A%2F%2F" in str(req.url)
++        assert payload["dimensions"] == ["query"]
++        assert payload["dimensionFilterGroups"][0]["filters"][0]["operator"] == "contains"
++    elif name == "dataforseo":
++        assert req.headers["Authorization"].startswith("Basic ")
++        assert isinstance(payload, list)
++        assert ("keyword" if operation == "suggestions" else "keywords") in payload[0]
++    elif name == "semrush":
++        assert req.url.params["key"] == "secret-semrush"
++        assert req.url.params["export_columns"] == "Ph,Nq,Cp,Co"
++    elif name == "ahrefs":
++        assert req.headers["Authorization"] == "Bearer secret-ahrefs"
++        assert req.url.params["terms"] == ("questions" if operation == "questions" else "all")
++        assert next(e for e in result.keywords[0].evidence if e.metric == "cpc").unit == "USD_cents"
++    elif name == "keywordtool":
++        assert payload["apikey"] == "secret-keywordtool"
++        assert "secret-keywordtool" not in str(req.url)
++        assert isinstance(payload["keyword"], list) == (operation == "metrics")
++    elif name == "keywords-everywhere":
++        assert parse_qs(req.content.decode())["kw[]"] == ["paper planes"]
++        assert req.headers["Authorization"] == "Bearer secret-everywhere"
++    elif name == "alsoasked":
++        assert req.headers["X-Api-Key"] == "secret-alsoasked"
++        assert payload["async"] is False
++        assert payload["notify_webhooks"] is False
++        assert result.keywords[1].metadata["parent_question"] == "How do paper planes fly?"
++    elif name == "serpapi":
++        assert req.url.params["api_key"] == "secret-serpapi"
++        assert req.url.params["engine"] == ("google_autocomplete" if operation == "autocomplete" else "google")
++    elif name == "brave-suggest":
++        assert req.headers["X-Subscription-Token"] == "secret-brave"
++        assert req.url.params["count"] == "20"
++    elif name == "datamuse":
++        assert {"related":"ml", "synonyms":"rel_syn", "suggestions":"s"}[operation] in req.url.params
++
++
++@pytest.mark.parametrize("name,operation,fixture,options,host,path", CASES)
++def test_provider_http_failure_does_not_leak_credentials(name, operation, fixture, options, host, path):
++    with pytest.raises(OnlineSourceError, match="HTTP 401") as exc:
++        call(name, operation, options, lambda _: httpx.Response(401, text="secret-body " + " ".join(CREDENTIALS.values())))
++    assert "secret-" not in str(exc.value)
++    assert exc.value.__suppress_context__ or exc.value.__context__ is None
++
++
++@pytest.mark.parametrize("name,operation,fixture,options,host,path", CASES)
++def test_html_challenge_is_not_silently_empty(name, operation, fixture, options, host, path):
++    with pytest.raises(OnlineSourceError):
++        call(name, operation, options, lambda _: httpx.Response(200, text="<html>challenge</html>"))
++
++
++def test_metrics_preserve_zero_and_null():
++    result = call("google-ads", "ideas", {"customer_id":"123", "location_codes":"2826"}, lambda _: response_for("google_ads_ideas"))
++    evidence = {e.metric:e.value for e in result.keywords[0].evidence}
++    assert evidence["avg_monthly_searches"] == 0
++    assert evidence["high_top_of_page_bid"] is None
++
++
++def test_key_precedence_and_blank_does_not_fall_back():
++    def handler(req):
++        assert req.url.params["key"] == "explicit-key"
++        return response_for("semrush")
++    call("semrush", "related", {"database":"uk", "api_key":"explicit-key"}, handler)
++    with pytest.raises(ConfigurationError):
++        call("semrush", "related", {"database":"uk", "api_key":""}, lambda _: pytest.fail("must not call"))
++
++
++def test_google_pagination_and_request_budget():
++    calls = []
++    def handler(req):
++        body = json.loads(req.content)
++        calls.append(body)
++        data = json.loads((FIXTURES / "google_ads_ideas.json").read_text())
++        data["nextPageToken"] = "next-page"
++        return httpx.Response(200, json=data)
++    options = {"customer_id":"123", "location_codes":"2826", "page_size":1, "limit":3, "max_pages":2}
++    result = call("google-ads", "ideas", options, handler)
++    assert len(calls) == 2
++    assert calls[1]["pageToken"] == "next-page"
++    assert result.metadata["next_page_token"] == "next-page"
++    with pytest.raises(OnlineSourceError, match="budget"):
++        call("google-ads", "ideas", {**options, "max_requests":1}, handler)
++
++
++def test_search_console_page_boundaries_and_scope():
++    calls = []
++    def handler(req):
++        calls.append(json.loads(req.content))
++        return response_for("search_console") if len(calls) == 1 else httpx.Response(200, json={})
++    options = {"site_url":"sc-domain:example.org", "start_date":"2026-09-01", "end_date":"2026-09-30",
++               "country":"gbr", "page_size":1, "max_pages":2}
++    result = call("search-console", "queries", options, handler, keywords=())
++    assert calls[1]["startRow"] == 1
++    assert result.metadata["next_start_row"] is None
++    assert result.keywords[0].metadata["date_timezone"] == "America/Los_Angeles"
++    assert result.keywords[0].evidence[0].geography == "gbr"
++
++
++def test_task_failure_is_not_ignored():
++    payload = {"status_code":20000, "tasks":[{"status_code":40200, "status_message":"secret-password"}]}
++    with pytest.raises(OnlineSourceError, match="task"):
++        call("dataforseo", "ideas", {"location_code":2826}, lambda _: httpx.Response(200,json=payload))
++
++
++def test_keywordtool_partial_notice_and_limit_are_visible():
++    payload = json.loads((FIXTURES/"keywordtool.json").read_text())
++    payload["notice"] = {"code":10, "message":"partial"}
++    payload["results"]["paper planes"]["volume"] = None
++    result = call("keywordtool", "suggestions", {"country":"GB", "metrics":True, "location_code":2826}, lambda _: httpx.Response(200,json=payload))
++    assert result.metadata["partial_notice"] is True
++    assert "partial" in result.metadata["completeness"]
++    assert next(e for e in result.keywords[0].evidence if e.metric=="estimated_search_volume").value is None
++
++
++def test_semrush_no_data_differs_from_error():
++    result = call("semrush", "related", {"database":"uk"}, lambda _: httpx.Response(200,text="ERROR 50 :: NOTHING FOUND"))
++    assert not result.keywords
++    with pytest.raises(OnlineSourceError):
++        call("semrush", "related", {"database":"uk"}, lambda _: httpx.Response(200,text="ERROR 120 :: KEY secret-semrush"))
++
++
++def test_alsoasked_pending_does_not_resubmit_or_emit_empty_success():
++    calls = []
++    def handler(req):
++        calls.append(req)
++        return httpx.Response(200,json={"status":"pending"})
++    with pytest.raises(OnlineSourceError, match="not complete"):
++        call("alsoasked", "questions", {"country":"gb"}, handler)
++    assert len(calls) == 1
++
++
++@pytest.mark.parametrize("name,operation,options", [
++    ("google-ads", "ideas", {"customer_id":"../", "location_codes":"2826"}),
++    ("google-ads", "ideas", {"customer_id":"123", "location_codes":"wrong"}),
++    ("dataforseo", "ideas", {}),
++    ("ahrefs", "matching-terms", {"country":"../../"}),
++    ("keywordtool", "metrics", {}),
++    ("wikipedia", "suggestions", {"language":"en.attacker.test"}),
++    ("search-console", "queries", {"site_url":"sc-domain:example.org", "start_date":"2026-09-30", "end_date":"2026-09-01"}),
++])
++def test_invalid_options_never_make_network_requests(name,operation,options):
++    with pytest.raises(ConfigurationError):
++        call(name, operation, options, lambda _: pytest.fail("unexpected request"))
++
++
++def test_multi_keyword_batch_is_not_silently_truncated():
++    captured = []
++    def handler(req):
++        captured.append(parse_qs(req.content.decode()))
++        return response_for("keywords_everywhere")
++    call("keywords-everywhere", "metrics", {"country":"gb"}, handler, keywords=("paper planes","paper folding"))
++    assert captured[0]["kw[]"] == ["paper planes","paper folding"]
++    with pytest.raises(ConfigurationError):
++        call("semrush", "related", {"database":"uk"}, handler, keywords=("one","two"))
++
++
++@pytest.mark.parametrize("platform", ["google","bing","youtube","perplexity","amazon","ebay",
++                                     "app-store","play-store","instagram","twitter","reddit",
++                                     "pinterest","etsy","tiktok","naver","google-trends"])
++def test_keywordtool_all_platform_suggestion_routes(platform):
++    def handler(req):
++        payload = json.loads(req.content)
++        assert req.url.path == f"/v2/search/suggestions/{platform}"
++        assert payload["country"] == "GB"
++        assert payload["metrics"] is False
++        assert payload["type"] == {"instagram":"hashtags","google-trends":"top"}.get(platform,"suggestions")
++        return response_for("keywordtool")
++    call("keywordtool","suggestions",{"platform":platform,"country":"GB"},handler)
++
++
++@pytest.mark.parametrize("platform", ["google","bing","youtube","perplexity","amazon","ebay",
++                                     "app-store","play-store","instagram","twitter","reddit",
++                                     "pinterest","etsy","tiktok","naver"])
++def test_keywordtool_metrics_use_platform_specific_localization(platform):
++    def handler(req):
++        payload = json.loads(req.content)
++        assert req.url.path == f"/v2/search/volume/{platform}"
++        if platform in {"google","bing"}:
++            assert payload["metrics_location"] == [188 if platform == "bing" else 2826]
++            assert "country" not in payload
++            assert "metrics_network" in payload
++        else:
++            assert payload["country"] == "GB"
++            assert "metrics_location" not in payload
++            assert "metrics_network" not in payload
++        return response_for("keywordtool")
++    call("keywordtool","metrics",{"platform":platform,"country":"GB", "location_code":188 if platform=="bing" else 2826},handler)
++
++
++def test_keywordtool_different_suggestion_and_volume_geographies():
++    result = call("keywordtool","suggestions",{"country":"US","metrics":True,"location_code":2826},lambda _: response_for("keywordtool"))
++    scopes={e.metric:e.geography for e in result.keywords[0].evidence}
++    assert scopes["returned_order"] == "US"
++    assert scopes["estimated_search_volume"] == "google:location:2826"
++
++
++@pytest.mark.parametrize("options", [{"platform":"instagram","suggestion_type":"questions","country":"GB"},
++                                     {"platform":"google-trends","metrics":True,"country":"GB"}])
++def test_keywordtool_unsupported_platform_combinations_fail_before_request(options):
++    with pytest.raises(ConfigurationError):
++        call("keywordtool","suggestions",options,lambda _: pytest.fail("must not request"))
+diff --git a/tests/test_online_transport.py b/tests/test_online_transport.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..1d750d4deb5e9bbd69219fc50fe9ae70e4d73535
+--- /dev/null
++++ b/tests/test_online_transport.py
+@@ -0,0 +1,149 @@
++from __future__ import annotations
++
++import json
++import os
++import subprocess
++import sys
++from pathlib import Path
++
++import pytest
++
++from keywordmoves.cli import main
++from keywordmoves.online import factories
++from keywordmoves.online.common import (
++    HTTP,
++    ConfigurationError,
++    OnlineSourceError,
++    boolean,
++    integer,
++    iso_date,
++    number,
++    secret,
++)
++
++
++httpx = pytest.importorskip("httpx")
++
++
++def test_all_plugins_are_registered_without_optional_imports():
++    root = Path(__file__).resolve().parents[1]
++    code = '''
++import builtins
++real_import = builtins.__import__
++def checked(name, *args, **kwargs):
++    if name.split('.')[0] in {'httpx','bs4','requests','torch','spacy','nltk','openai','keybert','sentence_transformers'}:
++        raise ImportError(name)
++    return real_import(name, *args, **kwargs)
++builtins.__import__ = checked
++from keywordmoves.cli import main
++raise SystemExit(main(['plugins','--json']))
++'''
++    result = subprocess.run([sys.executable,"-c",code],cwd=root,
++                            env={**os.environ,"PYTHONPATH":str(root/"src")},capture_output=True,text=True,check=True)
++    names = {v["name"] for v in json.loads(result.stdout) if v["kind"] == "keyword"}
++    assert set(factories()).issubset(names)
++    assert len(factories()) == 18
++
++
++@pytest.mark.parametrize("status", [301,302,307,308,401,402,403,404,429,500,503])
++def test_no_redirects_no_retries_no_secret_errors(status):
++    calls = []
++    def handler(req):
++        calls.append(req)
++        return httpx.Response(status,headers={"Location":"https://attacker.example/secret"},text="secret-value")
++    with HTTP({},("provider.example",),httpx.MockTransport(handler)) as client:
++        with pytest.raises(OnlineSourceError) as exc:
++            client.request("GET","https://provider.example/api",params={"api_key":"secret-value"})
++        assert "secret-value" not in str(exc.value)
++    assert len(calls) == 1
++
++
++@pytest.mark.parametrize("error", [httpx.ReadTimeout,httpx.ConnectError,httpx.ReadError])
++def test_network_errors_hide_request_details(error):
++    def handler(req):
++        raise error("URL includes secret-value",request=req)
++    with HTTP({},("provider.example",),httpx.MockTransport(handler)) as client:
++        with pytest.raises(OnlineSourceError) as exc:
++            client.json("GET","https://provider.example/?api_key=secret-value")
++        assert "secret-value" not in str(exc.value)
++        assert exc.value.__suppress_context__
++
++
++def test_decoded_size_limit():
++    with HTTP({"max_response_bytes":1024},("provider.example",),httpx.MockTransport(lambda _: httpx.Response(200,content=b'x'*1025))) as client:
++        with pytest.raises(OnlineSourceError,match="exceeded"):
++            client.request("GET","https://provider.example/api")
++
++
++@pytest.mark.parametrize("url", ["http://provider.example/api","https://attacker.example/api", "https://user:pass@provider.example/api", "https://provider.example:8443/api"])
++def test_fixed_hosts_and_https_are_enforced(url):
++    with HTTP({},("provider.example",),httpx.MockTransport(lambda _: pytest.fail("must not request"))) as client:
++        with pytest.raises(ConfigurationError):
++            client.request("GET",url)
++
++
++@pytest.mark.parametrize("payload", ['NaN','Infinity','{"value":NaN}', '<html>captcha</html>'])
++def test_invalid_json_fails_explicitly(payload):
++    with HTTP({},("provider.example",),httpx.MockTransport(lambda _: httpx.Response(200,text=payload))) as client:
++        with pytest.raises(OnlineSourceError):
++            client.json("GET","https://provider.example/")
++
++
++@pytest.mark.parametrize("value", [True,False,"1.2",-1,1001,"hello",float('inf')])
++def test_integer_options_validate(value):
++    with pytest.raises(ConfigurationError):
++        integer({"limit":value},"limit",50,1,1000)
++
++
++@pytest.mark.parametrize("value", [True,float('nan'),float('inf'),"unknown",[],{}])
++def test_numbers_reject_invalid_metrics(value):
++    with pytest.raises(OnlineSourceError):
++        number(value)
++
++
++@pytest.mark.parametrize("value,expected", [(None,None),("",None),(0,0),("0",0),("2.5",2.5)])
++def test_numbers_do_not_conflate_null_and_zero(value,expected):
++    assert number(value) == expected
++
++
++def test_credentials_are_resolved_at_run_time_and_do_not_fall_back(monkeypatch):
++    monkeypatch.setenv("TEST_KEY","first")
++    assert secret({},"api_key","TEST_KEY") == "first"
++    monkeypatch.setenv("TEST_KEY","second")
++    assert secret({},"api_key","TEST_KEY") == "second"
++    assert secret({"api_key":"explicit"},"api_key","TEST_KEY") == "explicit"
++    for value in ("",None,True,"key\nvalue"):
++        with pytest.raises(ConfigurationError):
++            secret({"api_key":value},"api_key","TEST_KEY")
++
++
++def test_strict_boolean_and_date():
++    assert boolean({"x":"false"},"x") is False
++    assert boolean({"x":True},"x") is True
++    with pytest.raises(ConfigurationError):
++        boolean({"x":"yes"},"x")
++    assert iso_date({"when":"2026-10-02"},"when") == "2026-10-02"
++    with pytest.raises(ConfigurationError):
++        iso_date({"when":"20261002"},"when")
++
++
++def test_cli_import_and_missing_key_are_clean(capsys,monkeypatch):
++    fixture = Path(__file__).parent/"fixtures"/"online"/"export.csv"
++    assert main(["run","ubersuggest","--operation","import-csv","--input",str(fixture),
++                 "--option","phrase_column=Keyword","--option","observed_at=2026-10-01",
++                 "--option","platform=Google"]) == 0
++    data = json.loads(capsys.readouterr().out)
++    assert data["metadata"]["live_query_performed"] is False
++    monkeypatch.delenv("SEMRUSH_API_KEY",raising=False)
++    assert main(["run","semrush","--operation","related","--keyword","paper planes","--option","database=uk"]) == 2
++    assert "SEMRUSH_API_KEY" in capsys.readouterr().err
++
++
++def test_local_output_truncation_is_reported():
++    from keywordmoves.models import ExecutionContext, PluginRequest
++    result = factories()["datamuse"](transport=httpx.MockTransport(lambda _: httpx.Response(200,json=[
++        {"word":"first","score":2},{"word":"second","score":1}]))) .run(
++            PluginRequest("related",keywords=("paper",),options={"limit":1}),ExecutionContext(None))
++    assert len(result.keywords) == 1
++    assert result.metadata["output_truncated"] is True
++    assert result.metadata["rows_received"] == 2
+diff --git a/tests/test_online_websites.py b/tests/test_online_websites.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..1207ed4c1291c63347061cc2d523703a553be842
+--- /dev/null
++++ b/tests/test_online_websites.py
+@@ -0,0 +1,217 @@
++from __future__ import annotations
++
++import socket
++from pathlib import Path
++
++import pytest
++
++from keywordmoves.models import ExecutionContext, PluginRequest
++from keywordmoves.online import factories
++from keywordmoves.online.common import ConfigurationError, OnlineSourceError
++from keywordmoves.online.websites import parse_html, public_url
++
++httpx = pytest.importorskip("httpx")
++pytest.importorskip("bs4")
++
++FIXTURES = Path(__file__).parent / "fixtures" / "online"
++
++
++@pytest.fixture(autouse=True)
++def no_wait_and_public_dns(monkeypatch):
++    monkeypatch.setattr("keywordmoves.online.common.time.sleep", lambda _: None)
++    monkeypatch.setattr(socket, "getaddrinfo", lambda *args, **kwargs: [(2, 1, 6, "", ("93.184.216.34", 443))])
++
++
++def network(name, operation, options, handler):
++    plugin = factories()[name](transport=httpx.MockTransport(handler))
++    return plugin.run(PluginRequest(operation, keywords=("paper & planes",), options=options), ExecutionContext(None))
++
++
++@pytest.mark.parametrize("name,host,query_param", [
++    ("google-autocomplete", "suggestqueries.google.com", "q"),
++    ("bing-autocomplete", "api.bing.com", "query"),
++    ("duckduckgo-autocomplete", "ac.duckduckgo.com", "q"),
++])
++def test_browser_endpoint_queries_and_robots(name, host, query_param):
++    requests = []
++    def handler(req):
++        requests.append(req)
++        assert req.url.host == host
++        if req.url.path == "/robots.txt":
++            return httpx.Response(200,text="User-agent: *\nAllow: /\n")
++        assert req.url.params[query_param] == "paper & planes"
++        return httpx.Response(200,content=(FIXTURES/"autocomplete.json").read_bytes())
++    result = network(name, "suggestions", {"allow_unofficial":True}, handler)
++    assert len(requests) == 2
++    assert result.metadata["access"] == "unofficial-web-endpoint"
++    assert result.metadata["request_count"] == 2
++    assert len(result.keywords) == 2
++
++
++@pytest.mark.parametrize("name", ["google-autocomplete","bing-autocomplete","duckduckgo-autocomplete"])
++def test_unofficial_endpoints_require_explicit_opt_in(name):
++    with pytest.raises(ConfigurationError, match="allow_unofficial"):
++        network(name,"suggestions",{},lambda _: pytest.fail("must not request"))
++
++
++@pytest.mark.parametrize("policy", ["User-agent: *\nDisallow: /\n", "<html>challenge</html>",
++                                    "User-agent: *\nCrawl-delay: 120\n"])
++def test_robots_failures_stop_before_search(policy):
++    requests = []
++    def handler(req):
++        requests.append(req)
++        assert req.url.path == "/robots.txt"
++        return httpx.Response(200,text=policy)
++    with pytest.raises(OnlineSourceError):
++        network("google-autocomplete","suggestions",{"allow_unofficial":True},handler)
++    assert len(requests) == 1
++
++
++@pytest.mark.parametrize("status", [301,302,401,403,429,500])
++def test_robots_failure_status_is_not_allow_all(status):
++    with pytest.raises(OnlineSourceError):
++        network("bing-autocomplete","suggestions",{"allow_unofficial":True},lambda _: httpx.Response(status))
++
++
++@pytest.mark.parametrize("status", [404,410])
++def test_missing_robots_allows_only_the_bounded_search(status):
++    def handler(req):
++        if req.url.path == "/robots.txt":
++            return httpx.Response(status)
++        return httpx.Response(200,json=["paper",[]])
++    result = network("duckduckgo-autocomplete","suggestions",{"allow_unofficial":True},handler)
++    assert result.keywords == ()
++
++
++def test_direct_endpoint_malformed_success_is_not_empty():
++    def handler(req):
++        if req.url.path == "/robots.txt":
++            return httpx.Response(404)
++        return httpx.Response(200,json={"error":"challenge"})
++    with pytest.raises(OnlineSourceError):
++        network("google-autocomplete","suggestions",{"allow_unofficial":True},handler)
++
++
++def test_public_html_query_and_extraction():
++    calls = []
++    def handler(req):
++        calls.append(req)
++        if req.url.path == "/robots.txt":
++            return httpx.Response(200,text="User-agent: *\nAllow: /\nCrawl-delay: 3\n")
++        assert req.url.params["q"] == "paper & planes"
++        assert "Authorization" not in req.headers
++        assert "api_key" not in req.url.params
++        return httpx.Response(200,content=(FIXTURES/"results.html").read_bytes())
++    result = network("website-keywords","query",{"url_template":"https://example.org/search?q={query}","selector":".result"},handler)
++    assert [k.phrase for k in result.keywords] == ["Paper planes","Paper folding"]
++    assert result.metadata["access"] == "public-html"
++    assert len(calls) == 2
++    assert result.keywords[0].score is None
++
++
++@pytest.mark.parametrize("url", [
++    "http://example.org/", "https://localhost/", "https://host.local/", "https://user:pass@example.org/",
++    "https://example.org:8443/", "https://example.org/#fragment", "file:///etc/passwd",
++])
++def test_public_url_validation(url):
++    with pytest.raises(ConfigurationError):
++        public_url(url)
++
++
++@pytest.mark.parametrize("address", ["127.0.0.1","10.0.0.1","169.254.169.254","::1","fe80::1"])
++def test_private_network_addresses_are_rejected(address, monkeypatch):
++    monkeypatch.setattr(socket,"getaddrinfo",lambda *a, **kw: [(2,1,6,"",(address,443))])
++    with pytest.raises(ConfigurationError):
++        public_url("https://attacker.example/")
++
++
++@pytest.mark.parametrize("template", ["https://{query}.example.org/search", "https://example.org/{query}",
++                                      "https://example.org/?q={query}&x={query}","https://example.org/?q={other}"])
++def test_template_substitution_cannot_change_hostname_or_path(template):
++    with pytest.raises(ConfigurationError):
++        network("website-keywords","query",{"url_template":template,"selector":".result"},lambda _: pytest.fail("must not request"))
++
++
++@pytest.mark.parametrize("body", [
++    '<html><title>Just a moment...</title></html>',
++    '<input type="password"><div class="result">Sign in</div>',
++    '<div class="g-recaptcha"></div><div class="result">Verify</div>',
++    '<html><title>Access denied</title></html>',
++])
++def test_challenge_pages_are_not_keywords(body):
++    with pytest.raises(OnlineSourceError,match="challenge"):
++        parse_html(body,{"selector":".result"},"test","2026-10-02",None)
++
++
++def test_empty_results_marker_is_explicit():
++    body = '<div id="no-results">No matching keywords</div>'
++    with pytest.raises(OnlineSourceError,match="No keyword"):
++        parse_html(body,{"selector":".result"},"test","2026-10-02",None)
++    items, notes = parse_html(body,{"selector":".result","empty_selector":"#no-results"},"test","2026-10-02",None)
++    assert not items and notes
++
++
++def test_invalid_css_and_hidden_dom():
++    with pytest.raises(ConfigurationError):
++        parse_html('<div>Hi</div>',{"selector":"["},"test","2026-10-02",None)
++    with pytest.raises(OnlineSourceError,match="no visible"):
++        parse_html('<div class="result" aria-hidden="true">Hidden</div>',{"selector":".result"},"test","2026-10-02",None)
++
++
++@pytest.mark.parametrize("name", ["website-keywords","ubersuggest","answerthepublic"])
++def test_saved_html_import_is_not_claimed_as_live(name):
++    options={"selector":".result","observed_at":"2026-10-01","platform":"Google"}
++    result = factories()[name]().run(PluginRequest("import-html",inputs=(FIXTURES/"results.html",),options=options),ExecutionContext(None))
++    assert result.metadata["live_query_performed"] is False
++    assert len(result.keywords) == 2
++    assert result.keywords[0].evidence[0].observed_at == "2026-10-01"
++
++
++@pytest.mark.parametrize("name", ["ubersuggest","answerthepublic"])
++def test_explicit_report_column_mapping_and_nulls(name):
++    options={"phrase_column":"Keyword","volume_column":"Volume","cpc_column":"CPC",
++             "difficulty_column":"Difficulty","currency":"USD","observed_at":"2026-10-01","platform":"Google"}
++    result = factories()[name]().run(PluginRequest("import-csv",inputs=(FIXTURES/"export.csv",),options=options),ExecutionContext(None))
++    first = {e.metric:e.value for e in result.keywords[0].evidence}
++    second = {e.metric:e.value for e in result.keywords[1].evidence}
++    assert first["reported_search_volume"] == 0
++    assert second["reported_search_volume"] is None
++    assert first["reported_cpc"] == 1.25
++    assert result.metadata["live_query_performed"] is False
++
++
++@pytest.mark.parametrize("options", [
++    {"phrase_column":"Missing","observed_at":"2026-10-01","platform":"Google"},
++    {"phrase_column":"Keyword","observed_at":"yesterday","platform":"Google"},
++    {"phrase_column":"Keyword","observed_at":"2026-10-01"},
++])
++def test_report_import_requires_meaningful_provenance(options):
++    from keywordmoves.errors import KeywordMovesError
++    with pytest.raises(KeywordMovesError):
++        factories()["ubersuggest"]().run(PluginRequest("import-csv",inputs=(FIXTURES/"export.csv",),options=options),ExecutionContext(None))
++
++
++def test_import_only_tools_do_not_pretend_to_query():
++    with pytest.raises(ConfigurationError,match="not live"):
++        factories()["ubersuggest"]().run(PluginRequest("query",keywords=("paper",)),ExecutionContext(None))
++
++
++def test_import_html_requires_observation_date():
++    with pytest.raises(ConfigurationError):
++        factories()["website-keywords"]().run(PluginRequest("import-html",inputs=(FIXTURES/"results.html",),options={"selector":".result"}),ExecutionContext(None))
++
++
++@pytest.mark.parametrize("raw,expected", [("1,250",1250),("1,250.50",1250.5),("0",0),("N/A",None)])
++def test_report_numeric_thousands_groups(raw, expected):
++    plugin = factories()["ubersuggest"]()
++    body = f'Keyword,Volume\nphrase,"{raw}"\n'
++    items, _ = plugin._csv(body, {"phrase_column":"Keyword","volume_column":"Volume"}, "2026-10-02", "Google")
++    assert next(e.value for e in items[0].evidence if e.metric == "reported_search_volume") == expected
++
++
++@pytest.mark.parametrize("raw", ["1,25","1.250,50","1,2,3","<10"])
++def test_report_ambiguous_numbers_are_not_guessed(raw):
++    from keywordmoves.errors import KeywordMovesError
++    body = f'Keyword,Volume\nphrase,"{raw}"\n'
++    with pytest.raises(KeywordMovesError):
++        factories()["ubersuggest"]()._csv(body, {"phrase_column":"Keyword","volume_column":"Volume"}, "2026-10-02", "Google")
+diff --git a/tests/test_registry.py b/tests/test_registry.py
+index 6e84c1d74f4ac5599781b2144c47ff5b144aab57..7b4913352935008f3cd8dc252738e49274191996 100644
+--- a/tests/test_registry.py
++++ b/tests/test_registry.py
+@@ -1,8 +1,10 @@
++from keywordmoves.online import factories as online_factories
+ from keywordmoves.registry import LLMRegistry, PluginRegistry
+ 
+ 
+ def test_builtin_keyword_plugins_are_discoverable():
+-    assert PluginRegistry().names() == ("google-trends", "keybert", "nltk", "observed-evidence", "spacy", "text-library")
++    expected = {"google-trends", "keybert", "nltk", "observed-evidence", "spacy", "text-library"}
++    assert set(PluginRegistry().names()) == expected | set(online_factories())
+ 
+ 
+ def test_builtin_llm_plugin_is_discoverable():
+diff --git a/tests/test_spacy_config.py b/tests/test_spacy_config.py
+index 163f0277c89a3afa76bd0d8ec1fe12bff75a4761..820bf0a630c06f665ce63093dcfad1e068e50f29 100644
+--- a/tests/test_spacy_config.py
++++ b/tests/test_spacy_config.py
+@@ -122,6 +122,6 @@ raise SystemExit(main(["plugins", "--json"]))
+     result = subprocess.run([sys.executable, "-c", code], cwd=root, env=env,
+                             capture_output=True, text=True, check=True)
+     items = json.loads(result.stdout)
+-    assert {item["name"] for item in items if item["kind"] == "keyword"} == {
++    assert {item["name"] for item in items if item["kind"] == "keyword"} >= {
+         "google-trends", "keybert", "nltk", "observed-evidence", "spacy", "text-library",
+     }

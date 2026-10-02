@@ -1,0 +1,14 @@
+{
+  "rows": [
+    {
+      "keys": [
+        "paper planes"
+      ],
+      "clicks": 3,
+      "impressions": 30,
+      "ctr": 0.1,
+      "position": 4.2
+    }
+  ],
+  "responseAggregationType": "byProperty"
+}

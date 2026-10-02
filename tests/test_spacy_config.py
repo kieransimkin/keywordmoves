@@ -122,6 +122,6 @@ raise SystemExit(main(["plugins", "--json"]))
     result = subprocess.run([sys.executable, "-c", code], cwd=root, env=env,
                             capture_output=True, text=True, check=True)
     items = json.loads(result.stdout)
-    assert {item["name"] for item in items if item["kind"] == "keyword"} == {
+    assert {item["name"] for item in items if item["kind"] == "keyword"} >= {
         "google-trends", "keybert", "nltk", "observed-evidence", "spacy", "text-library",
     }

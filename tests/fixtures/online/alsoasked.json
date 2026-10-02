@@ -1,0 +1,19 @@
+{
+  "status": "success",
+  "queries": [
+    {
+      "term": "paper planes",
+      "results": [
+        {
+          "question": "How do paper planes fly?",
+          "results": [
+            {
+              "question": "What is lift?",
+              "results": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
