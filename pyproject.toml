@@ -50,6 +50,7 @@ dev = [
 keywordmoves = "keywordmoves.cli:main"
 
 [project.entry-points."keywordmoves.plugins"]
+tiktok = "keywordmoves.online.tiktok:TikTokPlugin"
 instagram = "keywordmoves.online.instagram:InstagramPlugin"
 ahrefs = "keywordmoves.online.commercial:AhrefsPlugin"
 alsoasked = "keywordmoves.online.discovery:AlsoAskedPlugin"

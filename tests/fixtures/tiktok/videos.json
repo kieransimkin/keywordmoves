@@ -1,0 +1,9 @@
+{
+  "schema": "keywordmoves-tiktok/v1",
+  "videos": [
+    {"id": "101", "caption": "Paper planes over Brighton #UKGarage #BrightonMusic", "view_count": 1000, "like_count": 80, "comment_count": 10, "share_count": 20, "save_count": 5, "created_at": "2026-09-30T12:00:00Z", "username": "synthetic_artist_a", "music_id": "201", "duration": 20},
+    {"id": "102", "caption": "Independent music after dark #UKGarage #IndependentMusic", "view_count": 2000, "like_count": 100, "comment_count": 20, "share_count": 10, "save_count": 0, "created_at": "2026-10-01T12:00:00Z", "username": "synthetic_artist_b", "music_id": "201", "duration": 30},
+    {"id": "102", "caption": "Independent music after dark #UKGarage #IndependentMusic", "view_count": 2000},
+    {"id": "103", "caption": "A small show #BrightonMusic", "view_count": null, "like_count": 0}
+  ]
+}

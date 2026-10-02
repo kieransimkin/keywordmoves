@@ -1,0 +1,5 @@
+[
+  {"hashtagName": "ukgarage", "hashtagId": "synthetic101", "countryCode": "GB", "period": "7", "publishCnt": 20, "videoViews": 3000, "publishCntAll": 1000, "videoViewsAll": 100000,
+   "trend": [{"time": 1790726400, "value": 0.7}], "audienceInterests": [{"score": 142, "interestInfo": {"label": "Music"}}]},
+  {"hashtag": "brightonmusic", "country": "GB", "period": "7", "reported_post_count": "2.5K"}
+]

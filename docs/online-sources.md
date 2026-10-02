@@ -599,3 +599,13 @@ For Ubersuggest and AnswerThePublic the reviewed pages were insufficient to
 establish a live query parser. The import-only implementation and this explicit
 limitation preserve that uncertainty instead of presenting guessed requests as
 working integrations.
+
+
+## TikTok-specific discovery and analysis
+
+See [the TikTok module guide](tiktok.md) for known hashtag counts, video and
+comment samples, local reference extraction, official Display/Research and
+Commercial Content APIs, Keyword Tool search estimates, bounded Apify jobs,
+experimental public-page reads, reviewed exports and scoped snapshot changes.
+The `tiktok` keyword plugin keeps these measurements separate and never treats
+missing data as zero demand or as proof that a hashtag is banned.
