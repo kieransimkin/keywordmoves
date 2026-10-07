@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections import Counter
 from pathlib import Path
 from typing import Iterable
@@ -110,12 +111,66 @@ def _parse_llm_list(text: str) -> list[str]:
     return list(dict.fromkeys(phrases))
 
 
+def _literal_candidates(
+    documents: Iterable[tuple[str, str]], limit: int, max_ngram: int
+) -> list[KeywordCandidate]:
+    """Count contiguous Unicode phrases, preserving real source offsets."""
+    counts: Counter[str] = Counter()
+    spans: dict[str, list[dict[str, object]]] = {}
+    for source, text in documents:
+        tokens: list[tuple[str, int, int]] = []
+        start: int | None = None
+        for offset, char in enumerate(text + " "):
+            category = unicodedata.category(char)
+            letter = category.startswith(("L", "N"))
+            continuation = letter or category.startswith("M") or char in "'’\u200c-"
+            if start is None:
+                if letter:
+                    start = offset
+            elif not continuation:
+                end = offset
+                while end > start and text[end - 1] in "'’\u200c-":
+                    end -= 1
+                value = unicodedata.normalize("NFC", text[start:end]).casefold()
+                tokens.append((value, start, end))
+                start = None
+        for index in range(len(tokens)):
+            for width in range(1, max_ngram + 1):
+                chunk = tokens[index:index + width]
+                if len(chunk) != width:
+                    break
+                if any(
+                    not re.fullmatch(r"[ \t]+", text[left[2]:right[1]])
+                    for left, right in zip(chunk, chunk[1:])
+                ):
+                    break
+                if chunk[0][0] in STOPWORDS or chunk[-1][0] in STOPWORDS:
+                    continue
+                if width == 1 and len(chunk[0][0]) < 2:
+                    continue
+                phrase = " ".join(token[0] for token in chunk)
+                counts[phrase] += 1
+                records = spans.setdefault(phrase, [])
+                if len(records) < 20:
+                    records.append({"source": source, "start": chunk[0][1],
+                                    "end": chunk[-1][2],
+                                    "text": text[chunk[0][1]:chunk[-1][2]]})
+    ranked = sorted(counts, key=lambda phrase: (-counts[phrase], -len(phrase), phrase))
+    return [KeywordCandidate(
+        phrase=phrase, relationship="literal-text-extracted", score=None,
+        evidence=(KeywordEvidence(source="text-library", metric="occurrences",
+                                  value=counts[phrase], unit="count"),),
+        metadata={"source_spans": spans[phrase], "spans_truncated": counts[phrase] > 20,
+                  "max_ngram": max_ngram, "external_demand": "unvalidated"},
+    ) for phrase in ranked[:limit]]
+
+
 class TextLibraryPlugin:
     descriptor = PluginDescriptor(
         name="text-library",
         summary="Extract keywords from local text and expand concepts through a selected LLM plugin.",
         capabilities=("generate", "discover", "analyse"),
-        operations=("extract", "extract-local"),
+        operations=("extract", "extract-local", "extract-literal"),
     )
 
     def run(self, request: PluginRequest, context: ExecutionContext) -> PluginResult:
@@ -124,10 +179,34 @@ class TextLibraryPlugin:
                 f"text-library operation must be one of: {', '.join(self.descriptor.operations)}."
             )
         paths = _paths(request.inputs)
-        text, sources = _read(paths)
         limit = int(request.options.get("limit", 20))
         if limit < 1 or limit > 200:
             raise ConfigurationError("Text-library limit must be between 1 and 200.")
+        if request.operation == "extract-literal":
+            try:
+                max_ngram = int(request.options.get("max_ngram", 3))
+            except (TypeError, ValueError) as exc:
+                raise ConfigurationError("Literal max_ngram must be an integer.") from exc
+            if max_ngram < 1 or max_ngram > 5:
+                raise ConfigurationError("Literal max_ngram must be between 1 and 5.")
+            documents = []
+            for path in paths:
+                try:
+                    with path.open(encoding="utf-8-sig", newline="") as handle:
+                        documents.append((str(path), handle.read()))
+                except UnicodeDecodeError as exc:
+                    raise InputError(f"Text input is not UTF-8: {path}.") from exc
+            sources = tuple(source for source, _ in documents)
+            candidates = _literal_candidates(documents, limit, max_ngram)
+            return PluginResult(
+                plugin=self.descriptor.name, operation=request.operation,
+                keywords=tuple(candidates),
+                notes=(f"Read {len(sources)} local text file(s).",
+                       "No LLM was used; phrases are contiguous Unicode source text.",
+                       "Counts describe the input corpus only; external demand is unvalidated."),
+                metadata={"sources": sources, "max_ngram": max_ngram},
+            )
+        text, sources = _read(paths)
         local_limit = limit if request.operation == "extract-local" else max(1, limit // 3)
         candidates = _local_candidates(text, local_limit)
         notes = [f"Read {len(sources)} local text file(s)."]

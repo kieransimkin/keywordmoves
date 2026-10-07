@@ -73,6 +73,14 @@ class ObservedEvidencePlugin:
                 "source_url": str(row["source_url"]).strip() if row.get("source_url") else None,
                 "availability": str(row.get("availability", "observed")).strip(),
             }
+            # Preserve the subject and capture lineage in catalogue-wide runs.
+            # These are labels, not evidence of demand or a shared ranking score.
+            for field in ("subject", "seed_keyword", "capture_file", "capture_sha256",
+                          "evidence_kind", "limitations"):
+                if row.get(field) is not None:
+                    if not isinstance(row[field], str):
+                        raise InputError(f"Observation {index} field {field} must be text.")
+                    metadata[field] = row[field].strip()
             candidates.append(
                 KeywordCandidate(
                     phrase=phrase,

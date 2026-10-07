@@ -44,13 +44,25 @@ zero.
 
 ### Expand a text library
 
+Use `extract-literal` for exact contiguous source wording. It preserves Unicode
+letters, numbers, combining marks, internal apostrophes, Persian joiners and
+source character offsets, including Windows line endings. Read
+`docs/literal-text.md`; legacy `extract-local` retains filtered-token
+associations and must not be labelled literal lyrics. Corpus counts do not
+establish external search demand.
+
+For catalogue-wide browser observations, preserve the subject, seed, capture
+reference and SHA-256 through the optional lineage fields documented in
+`docs/browser-observations.md`. Capture and review each platform independently;
+loading skeletons and missing observations are not zero demand.
+
 Use KeywordMoves' transparent local extractor first when frequency and n-gram
 candidates are enough. This is the lower-compute route:
 
 ```powershell
 $keywordmoves = 'Z:\My Songs\Tools\keywordmoves\.venv\Scripts\keywordmoves.exe'
 & $keywordmoves run text-library `
-  --operation extract-local `
+  --operation extract-literal `
   --input '<canonical-text-path>' `
   --option limit=20 `
   --format json

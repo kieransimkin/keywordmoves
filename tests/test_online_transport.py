@@ -21,7 +21,6 @@ from keywordmoves.online.common import (
     secret,
 )
 
-
 httpx = pytest.importorskip("httpx")
 
 
