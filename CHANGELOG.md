@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1 - 2026-10-07
+
+- Install the online extra in the full CI matrix so saved-HTML importer tests run with their declared dependencies.
+- Validate NLTK source spans against untranslated source line endings in the pretrained-model test, including Windows checkouts.
+- Keep the extractor's source offsets and runtime behaviour unchanged.
+
 ## 0.3.0 - 2026-10-07
 
 - Add `text-library extract-literal` for contiguous Unicode phrases with source character spans and corpus occurrence counts. Preserve line, punctuation and file boundaries, internal stopwords, Windows line endings, Persian joiners and numeric names. Keep legacy extraction compatible.

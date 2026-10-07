@@ -36,7 +36,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="keywordmoves",
         description="Modular keyword discovery and evidence analysis.",
     )
-    parser.add_argument("--version", action="version", version="%(prog)s 0.3.0")
+    parser.add_argument("--version", action="version", version="%(prog)s 0.3.1")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     plugins = subparsers.add_parser("plugins", help="List keyword or LLM plugins.")

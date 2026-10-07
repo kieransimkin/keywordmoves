@@ -26,7 +26,9 @@ def test_pretrained_english_pipeline():
     features = {feature for k in result.keywords for feature in k.metadata["features"]}
     assert {"proper-nouns", "noun-chunks", "entities", "nouns"} <= features
     assert any(k.metadata["entity_labels"] for k in result.keywords)
-    text = fixture.read_text(encoding="utf-8")
+    # The extractor preserves source line endings so offsets remain reproducible.
+    with fixture.open(encoding="utf-8-sig", newline="") as handle:
+        text = handle.read()
     for k in result.keywords:
         for loc in k.metadata["occurrences"]:
             assert text[loc["start_char"]:loc["end_char"]] in k.metadata["surface_forms"]

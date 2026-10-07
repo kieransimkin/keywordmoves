@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "keywordmoves"
-version = "0.3.0"
+version = "0.3.1"
 description = "Modular keyword discovery and evidence analysis for the DanceFlow ecosystem"
 readme = "README.md"
 license = "MIT"
