@@ -120,6 +120,38 @@ def test_mine_uses_oauth_and_missing_uploads_fail_cleanly():
         call("channel", handler, mine=True)
 
 
+@pytest.mark.parametrize("selector", [{"mine": True}, {"handle": "@example"}, {"channel_id": CID}])
+def test_channel_without_uploads_needs_one_request_and_no_playlist(selector):
+    def handler(req):
+        assert req.url.path.endswith("/channels")
+        if selector.get("mine"):
+            assert req.headers["Authorization"] == "Bearer SECRET-TOKEN"
+            assert "key" not in req.url.params and req.url.params["mine"] == "true"
+        return httpx.Response(200, json={"items": [{"id": CID, "snippet": {"title": "Music"},
+                                                  "statistics": {"hiddenSubscriberCount": True}}]})
+    r, seen = call("channel", handler, **selector, include_uploads=False, max_requests=1)
+    assert len(seen) == 1 and r.metadata["request_count"] == 1
+    assert r.metadata["endpoint_calls"] == {"channels": 1}
+    assert r.metadata["channel"]["id"] == CID and not r.keywords
+    assert "subscriberCount" not in r.metadata["channel"]["statistics"]
+    assert r.metadata["uploads_included"] is False and r.metadata["pagination"] == []
+    assert r.metadata["collection_parameters"] == {"channel_id": CID, "include_uploads": False}
+
+
+@pytest.mark.parametrize("items", [[], [{"id": CID}, {"id": CID}]])
+def test_channel_without_uploads_still_requires_one_accessible_channel(items):
+    with pytest.raises(OnlineSourceError, match="one accessible channel"):
+        call("channel", lambda _: httpx.Response(200, json={"items": items}),
+             mine=True, include_uploads=False, max_requests=1)
+
+
+@pytest.mark.parametrize("operation,value", [("channel", "invalid"), ("videos", False)])
+def test_invalid_upload_selection_stops_before_network(operation, value):
+    with pytest.raises(ConfigurationError):
+        call(operation, lambda _: pytest.fail("no request expected"),
+             [V1] if operation == "videos" else (), include_uploads=value, mine=True)
+
+
 def test_playlist_and_popular():
     def handler(req):
         if req.url.path.endswith("/playlistItems"):
