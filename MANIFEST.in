@@ -8,3 +8,4 @@ recursive-include tests *.py *.txt *.csv *.json *.html *.md
 recursive-include docs/branding *.svg *.png *.md
 
 recursive-include examples *.py *.json *.csv *.md
+include AGENTS.md CONTRIBUTING.md
