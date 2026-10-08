@@ -480,3 +480,14 @@ def test_reviewed_legacy_labels_keep_language_and_unavailable_separate(tmp_path)
     canonical = {"schema": SCHEMA, "observations": [legacy["observations"][1]]}
     with pytest.raises(InputError):
         decode_payload(canonical, now=NOW)
+
+
+def test_broad_html_report_shows_actual_phrase_and_uncertain_completeness(store, tmp_path):
+    file = write_json(tmp_path / "broad-html.json", {"schema": "keywordmoves-watchlist/v1",
+        "watches": [watched(phrase=None)]})
+    store.add_watchlist(file, now=NOW)
+    ingest(store, tmp_path, [row(phrase="a visible example", completeness="unknown")])
+    html = analysis.render_html(analysis.coverage(store, now=NOW), {"changes": []})
+    assert "<td>a visible example</td>" in html
+    assert "<th>Completeness</th>" in html and "<td>unknown</td>" in html
+    assert "Current means capture freshness" in html

@@ -240,9 +240,10 @@ def render_html(report: dict[str, Any], change_report: dict[str, Any]) -> str:
     for item in report["rows"]:
         current = item["latest"] or {}
         rows.append("<tr>" + "".join("<td>" + escape(value) + "</td>" for value in (
-            item["subject"], item["platform"], item["phrase"], item["status"],
-            current.get("metric"), current.get("value"), current.get("unit"),
-            item["evidence_kind"], current.get("observed_at"))) + "</tr>")
+            item["subject"], item["platform"], item["phrase"] or current.get("phrase") or "Any phrase",
+            item["status"], current.get("metric"), current.get("value"), current.get("unit"),
+            current.get("evidence_kind") or item["evidence_kind"],
+            current.get("completeness"), current.get("observed_at"))) + "</tr>")
     change_rows = []
     for item in change_report["changes"]:
         change_rows.append("<li>" + escape(
@@ -259,12 +260,13 @@ def render_html(report: dict[str, Any], change_report: dict[str, Any]) -> str:
         'td,th{text-align:left;padding:.7rem;border-bottom:1px solid #34445b}'
         '.scroll{overflow:auto}input{padding:.6rem;max-width:100%;font:inherit}'
         'small{color:#b8c6d9}</style><main><h1>KeywordMoves evidence coverage</h1>'
-        '<p>Demand, owned exposure, content supply and language are shown separately.</p>'
+        '<p>Demand, owned exposure, content supply and language are shown separately. '
+        'Current means capture freshness; check completeness before interpreting a value.</p>'
         '<p>As of ' + escape(report["as_of"]) + ' · ' + escape(counts) + '</p>'
         '<label>Filter rows <input id="filter" type="search" placeholder="Song, platform or status"></label>'
         '<div class="scroll"><table><thead><tr>'
         '<th>Subject</th><th>Platform</th><th>Phrase</th><th>Status</th><th>Metric</th>'
-        '<th>Value</th><th>Unit</th><th>Evidence</th><th>Captured</th>'
+        '<th>Value</th><th>Unit</th><th>Evidence</th><th>Completeness</th><th>Captured</th>'
         '</tr></thead><tbody id="rows">' + "".join(rows) + '</tbody></table></div>'
         '<h2>Comparable changes</h2><ul>' + "".join(change_rows) + '</ul>'
         '<small>Local report. No notifications sent. Suggestions and missing results are not volume.</small>'
