@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.2 - 8 October 2026
+
+- Added PyPI trusted publishing through the configured `release.yml` workflow
+  and `pypi` environment. Publication verifies the immutable source tag,
+  package versions and checksums of the already tested GitHub distributions.
+- The exact GitHub wheel and source archive are uploaded without rebuilding
+  different packages or storing registry credentials in source.
+
 ## 0.4.1 - 8 October 2026
 
 - Corrected YouTube Analytics setup to require both `youtube.readonly` and
