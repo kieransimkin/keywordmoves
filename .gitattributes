@@ -1,0 +1,5 @@
+
+
+# Keep original DanceFlow artwork byte-identical across platform packages.
+**/branding/*.svg text eol=lf
+**/branding/*.png binary
