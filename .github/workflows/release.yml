@@ -7,6 +7,10 @@ on:
       tag:
         description: Existing validated GitHub release tag vMAJOR.MINOR.PATCH
         required: true
+      build_release:
+        description: Reconcile a missing GitHub release by testing and building its exact immutable tag
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -14,24 +18,29 @@ concurrency:
   cancel-in-progress: false
 jobs:
   build:
-    if: github.event_name == 'push'
+    outputs:
+      source: ${{ steps.identity.outputs.source }}
+    if: github.event_name == 'push' || inputs.build_release == true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 0
       - uses: actions/setup-python@v7
         with:
           python-version: '3.13'
-      - run: python -m pip install -e ".[dev]" twine
+      - run: python -m pip install -e ".[dev,online]" twine
       - run: python -m pytest
       - run: ruff check src tests
       - name: Build exact tested source
+        id: identity
         env:
-          TAG_NAME: ${{ github.ref_name }}
+          TAG_NAME: ${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
         run: |
           python -c "import os,pathlib,tomllib; p=tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']; assert p['name']=='keywordmoves' and 'v'+p['version']==os.environ['TAG_NAME']"
           test "$(git rev-parse HEAD)" = "$(git rev-parse "refs/tags/$TAG_NAME^{commit}")"
+          echo "source=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           export SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)"
           python -m build
           python -m twine check --strict dist/*.whl dist/*.tar.gz
@@ -42,7 +51,7 @@ jobs:
           path: dist/*
           if-no-files-found: error
   github-release:
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' || inputs.build_release == true
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -55,19 +64,20 @@ jobs:
       - name: Publish and independently verify the tested release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG_NAME: ${{ github.ref_name }}
+          TAG_NAME: ${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
+          SOURCE_COMMIT: ${{ needs.build.outputs.source }}
         run: |
           (cd dist && sha256sum --check SHA256SUMS.txt)
           if gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo 'Existing release is immutable; use the registry retry route.' >&2
             exit 1
           fi
-          gh release create "$TAG_NAME" dist/* --repo "$GITHUB_REPOSITORY" --verify-tag --title "KeywordMoves $TAG_NAME" --notes "Validated source: $GITHUB_SHA. Tests, lint and package metadata passed. Website: https://kieransimkin.co.uk/danceflow/"
+          gh release create "$TAG_NAME" dist/* --repo "$GITHUB_REPOSITORY" --verify-tag --title "KeywordMoves $TAG_NAME" --notes "Validated source: $SOURCE_COMMIT. Tests, lint and package metadata passed. Website: https://kieransimkin.co.uk/danceflow/"
           gh release download "$TAG_NAME" --repo "$GITHUB_REPOSITORY" --dir downloaded
           (cd downloaded && sha256sum --check SHA256SUMS.txt)
   pypi:
     needs: github-release
-    if: always() && (needs.github-release.result == 'success' || github.event_name == 'workflow_dispatch')
+    if: always() && (needs.github-release.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.build_release != true))
     runs-on: ubuntu-latest
     environment: pypi
     permissions:

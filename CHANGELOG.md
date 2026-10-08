@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.6 - 2026-10-09
+
+- Install the online extra in the release build so saved HTML-import tests have their declared parser/HTTP dependencies.
+- Add exact-tag recovery for a failed build without changing or overwriting immutable source tags or released asset bytes.
+
 ## 0.4.5 - 2026-10-08
 
 - Add explicit agent capability, improvement, validation and upstream PR guidance to the README and contributor instructions.
@@ -47,7 +52,7 @@
   renewal, platform approval and credentials remain external to KeywordMoves;
   no account data or credentials are bundled.
 
-## 0.4.0 — 8 October 2026
+## 0.4.0 â€” 8 October 2026
 
 - Import established reviewed browser-observation labels without treating sampled language as demand; verify bounded local capture hashes with separate database status.
 - Added private SQLite watchlists, hashed input captures, source-specific
@@ -75,7 +80,7 @@ points but no exact mean/peak summary. No campaign register is modified.
 
 - Add an original tool-specific vector logo and PNG companion in the shared DanceFlow visual style.
 - Clarify package descriptions from reviewed documentation and KeywordMoves literal-source evidence, without claims of measured search demand.
-- Link package descriptions and READMEs to Kieran Simkin’s website and retain branding files in installable packages.
+- Link package descriptions and READMEs to Kieran Simkinâ€™s website and retain branding files in installable packages.
 
 
 ## 0.3.1 - 2026-10-07

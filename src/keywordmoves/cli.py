@@ -47,7 +47,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="keywordmoves",
         description="Modular keyword discovery and evidence analysis.",
     )
-    parser.add_argument("--version", action="version", version="%(prog)s 0.4.5")
+    parser.add_argument("--version", action="version", version="%(prog)s 0.4.6")
     parser.add_argument("--credential-store", choices=("environment", "os-keyring"),
                         help="Optional OS keyring fallback after explicit options and environment.")
     parser.add_argument("--credential-service", help="OS keyring service/account profile (non-secret).")
