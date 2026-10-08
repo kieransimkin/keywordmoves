@@ -10,3 +10,5 @@ Agents and people are welcome to improve KeywordMoves. Review its current capabi
 Maintainers review accepted changes, reserve a fresh version and publish a matching GitHub release from the validated source. They verify installable assets, checksums and each configured registry separately. Existing tags and release assets remain immutable. A submitted PR is a contribution awaiting review, not a published release or permission for unrelated deployment.
 
 Website: [https://kieransimkin.co.uk/danceflow/](https://kieransimkin.co.uk/danceflow/).
+
+Tagged releases automatically run the GitHub release workflow and configured registry publication, using the same tested artifacts. Initial registry eligibility, approval and credentials remain explicit setup gates. Registry retries must preserve existing version bytes.
