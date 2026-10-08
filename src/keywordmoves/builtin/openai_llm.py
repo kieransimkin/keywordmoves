@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import math
-import os
 from typing import Any
 
+from ..credentials import credential_value
 from ..errors import ConfigurationError, KeywordMovesError
 from ..models import LLMRequest, LLMResult, PluginDescriptor
 
@@ -54,7 +54,7 @@ class OpenAILLM:
         options = request.options
         # An explicitly supplied key wins, even when invalid; never fall back to
         # another account silently. Resolve the environment at call time.
-        key = options.get("api_key") if "api_key" in options else os.environ.get("OPENAI_API_KEY")
+        key = options.get("api_key") if "api_key" in options else credential_value("OPENAI_API_KEY")
         if key is None:
             raise ConfigurationError(
                 "The OpenAI LLM plugin requires an API key. Set OPENAI_API_KEY or pass "

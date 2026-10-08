@@ -7,6 +7,7 @@ import string
 from typing import Any, Mapping
 from urllib.parse import urlencode
 
+from ..credentials import credential_value
 from ..errors import ConfigurationError
 from ..models import PluginRequest
 from .common import (
@@ -397,7 +398,7 @@ def pagespeed(request: PluginRequest, http: HTTP, observed: str) -> tuple[list, 
     url = normal_url(text(o, "url"))
     strategy = choice(o, "strategy", "mobile", ("mobile", "desktop"))
     params = {"url": url, "strategy": strategy, "category": "PERFORMANCE"}
-    if "api_key" in o or os.environ.get("PAGESPEED_API_KEY"):
+    if "api_key" in o or credential_value("PAGESPEED_API_KEY") is not None:
         params["key"] = secret(o, "api_key", "PAGESPEED_API_KEY")
     data = provider_error(http.json("GET", "https://www.googleapis.com/pagespeedonline/v5/runPagespeed", params=params))
     lighthouse = obj(data.get("lighthouseResult"))

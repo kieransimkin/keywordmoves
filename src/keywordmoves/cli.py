@@ -6,6 +6,13 @@ import sys
 from pathlib import Path
 from typing import Any, Sequence
 
+from .credentials import (
+    OSCredentialStore,
+    credential_context,
+    credential_settings,
+    credential_status,
+    read_credential,
+)
 from .errors import ConfigurationError, KeywordMovesError
 from .models import ExecutionContext, PluginRequest
 from .registry import LLMRegistry, PluginRegistry
@@ -17,6 +24,10 @@ def _option(value: str) -> tuple[str, Any]:
     key, raw = value.split("=", 1)
     if not key:
         raise argparse.ArgumentTypeError("Option keys cannot be empty.")
+    # Credentials are opaque text, including numeric or boolean-looking values.
+    if key in {"api_key", "access_token", "login", "password", "developer_token",
+               "serpapi_key", "apify_token", "llm_api_key"}:
+        return key, raw
     lowered = raw.casefold()
     if lowered in {"true", "false"}:
         parsed: Any = lowered == "true"
@@ -36,8 +47,20 @@ def build_parser() -> argparse.ArgumentParser:
         prog="keywordmoves",
         description="Modular keyword discovery and evidence analysis.",
     )
-    parser.add_argument("--version", action="version", version="%(prog)s 0.4.2")
+    parser.add_argument("--version", action="version", version="%(prog)s 0.4.3")
+    parser.add_argument("--credential-store", choices=("environment", "os-keyring"),
+                        help="Optional OS keyring fallback after explicit options and environment.")
+    parser.add_argument("--credential-service", help="OS keyring service/account profile (non-secret).")
     subparsers = parser.add_subparsers(dest="command", required=True)
+    credentials = subparsers.add_parser("credentials", help="Manage optional OS credentials without printing values.")
+    actions = credentials.add_subparsers(dest="credential_action", required=True)
+    setting = actions.add_parser("set", help="Store a credential using hidden input or a secure pipe.")
+    setting.add_argument("name")
+    setting.add_argument("--stdin", action="store_true", dest="credential_stdin")
+    status = actions.add_parser("status", help="Show presence only; no API validation or network requests.")
+    status.add_argument("names", nargs="*")
+    deleting = actions.add_parser("delete", help="Remove one credential from the selected OS profile.")
+    deleting.add_argument("name")
 
     plugins = subparsers.add_parser("plugins", help="List keyword or LLM plugins.")
     plugins.add_argument("--kind", choices=("keyword", "llm", "all"), default="all")
@@ -86,6 +109,34 @@ def _print_text(result: Any) -> None:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    try:
+        selected_store = args.credential_store
+        if args.command == "credentials" and selected_store is None:
+            selected_store = "os-keyring"
+        with credential_context(store=selected_store, service=args.credential_service):
+            return _dispatch(args)
+    except KeywordMovesError as exc:
+        print(f"keywordmoves: {exc}", file=sys.stderr)
+        return 2
+
+
+def _dispatch(args: argparse.Namespace) -> int:
+    if args.command == "credentials":
+        settings = credential_settings()
+        if args.credential_action == "status":
+            result = credential_status(args.names) if args.names else credential_status()
+            print(json.dumps(result, indent=2))
+            return 0
+        if settings.store != "os-keyring":
+            raise ConfigurationError("Use --credential-store os-keyring to store or remove credentials.")
+        store = OSCredentialStore(settings.service)
+        if args.credential_action == "set":
+            store.set(args.name, read_credential(from_stdin=args.credential_stdin))
+            print("Credential stored and readback verified; value not displayed.")
+        else:
+            store.delete(args.name)
+            print("Credential absent from the selected OS store.")
+        return 0
     keyword_plugins = PluginRegistry()
     llm_plugins = LLMRegistry()
     try:

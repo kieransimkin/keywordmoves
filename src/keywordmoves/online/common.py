@@ -6,13 +6,13 @@ from __future__ import annotations
 
 import json
 import math
-import os
 import re
 import time
 from datetime import date, datetime, timezone
 from typing import Any, Mapping
 from urllib.parse import urlsplit
 
+from ..credentials import credential_value
 from ..errors import ConfigurationError, KeywordMovesError
 from ..models import (
     ExecutionContext,
@@ -85,7 +85,7 @@ def iso_date(options: Mapping[str, Any], key: str) -> str:
 
 
 def secret(options: Mapping[str, Any], key: str, env: str) -> str:
-    value = options[key] if key in options else os.environ.get(env)
+    value = options[key] if key in options else credential_value(env)
     if not isinstance(value, str) or not value.strip() or any(ord(c) < 32 for c in value):
         raise ConfigurationError(f"Set {env} or --option {key}=... to a valid credential.")
     return value.strip()

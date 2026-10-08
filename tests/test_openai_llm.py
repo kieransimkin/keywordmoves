@@ -370,3 +370,14 @@ def test_cli_auth_error_returns_two_without_key_or_traceback(sdk, capsys):
     assert "sk-echoed-test" not in captured.err
     assert "Traceback" not in captured.err
     assert not captured.out
+
+
+def test_openai_resolves_opted_in_os_credential(sdk, monkeypatch):
+    from keywordmoves.credentials import credential_context
+    monkeypatch.delenv("OPENAI_API_KEY")
+    monkeypatch.setattr("keywordmoves.credentials.OSCredentialStore",
+                        lambda service: SimpleNamespace(get=lambda name: "fictional-keyring-key"))
+    with credential_context(store="os-keyring", service="example-account"):
+        result = generate()
+    assert sdk.module.OpenAI.call_args.kwargs["api_key"] == "fictional-keyring-key"
+    assert "fictional-keyring-key" not in json.dumps({"text": result.text, "metadata": result.metadata})

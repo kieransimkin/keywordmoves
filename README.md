@@ -43,6 +43,15 @@ depending on the archived, unofficial `pytrends` scraper or guessing an API
 contract. A live official-API backend can be added when access and its exact
 contract are available.
 
+## Credentials
+
+Authenticated readers accept explicit CLI options and environment variables.
+The optional `credentials` extra adds opt-in Windows Credential Manager,
+macOS Keychain and Linux Secret Service/KWallet storage, account profiles and
+presence-only management commands. See [credential configuration](docs/credentials.md)
+and [authenticated platform access](docs/authenticated-access.md) for precedence,
+scopes and verification limits. OAuth consent and renewal remain external.
+
 ## Install
 
 The core and Google Trends importer have no runtime dependencies:

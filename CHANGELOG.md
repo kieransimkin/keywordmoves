@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.4.3 - 8 October 2026
+
+- Added opt-in cross-platform OS credential storage through the optional
+  `credentials` extra, with Windows Credential Manager, macOS Keychain and
+  Linux Secret Service/KWallet backends; no plaintext fallback.
+- Preserved explicit CLI and environment credentials ahead of OS storage;
+  invalid explicit values fail instead of switching accounts. Credential
+  options preserve numeric/boolean-looking text. Integrated shared online
+  readers, provider adapters, OpenAI and monitor collectors.
+- Added hidden-input/secure-stdin storage, presence-only status, deletion,
+  account namespaces, context-local library composition, synthetic tests and
+  an offline reproducible example. OAuth consent and renewal remain external.
+- Expanded authenticated setup documentation for all three portable routes
+  and retained the exact-release trusted PyPI publication workflow.
+
 ## 0.4.2 - 8 October 2026
 
 - Added PyPI trusted publishing through the configured `release.yml` workflow

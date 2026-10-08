@@ -1,9 +1,12 @@
 # Authenticated platform access
 
-KeywordMoves accepts legitimately obtained credentials through documented
-environment variables. OAuth client creation, consent, token renewal, platform
-approval and secret storage remain external setup steps. Install the `online`
-extra for live readers. Nothing here starts a collector or scheduled job.
+KeywordMoves accepts legitimately obtained credentials through command-line
+options, environment variables and optional cross-platform OS keyring storage.
+OAuth client creation, consent, token renewal and platform approval remain
+external setup steps. Install the `online` extra for live readers and the
+`credentials` extra for OS storage. Nothing here starts a collector or scheduled
+job. See [credential configuration](credentials.md) for precedence, profiles
+and examples.
 
 Keep three independently verified states:
 
@@ -41,54 +44,19 @@ For Pinterest and other browser/export surfaces, use the native report and
 establish a Trends API entitlement. Keep the actual region/window and indexed,
 approximate or unavailable values; do not invent absolute volume.
 
-## Secure Windows injection example
+## Cross-platform secret storage
 
-This external composition uses the standard `keyring` package, not a built-in
-credential manager. It accepts an already authorized access token and does not
-issue or renew it. Install `keyring` in the same environment. Run interactively
-so the token does not enter command arguments or shell history:
-
-```python
-import getpass
-import keyring
-
-backend = keyring.get_keyring()
-if (type(backend).__module__, type(backend).__name__) != (
-    "keyring.backends.Windows", "WinVaultKeyring"
-):
-    raise RuntimeError("Use the verified Windows Credential Manager backend")
-keyring.set_password(
-    "KeywordMoves Local", "SEARCH_CONSOLE_ACCESS_TOKEN",
-    getpass.getpass("Authorized Search Console access token: "),
-)
-```
-
-Inject into the child process without printing the credential:
-
-```python
-import os
-import subprocess
-import sys
-import keyring
-
-token = keyring.get_password("KeywordMoves Local", "SEARCH_CONSOLE_ACCESS_TOKEN")
-if not token:
-    raise RuntimeError("Authorized credential is unavailable")
-result = subprocess.run(
-    [sys.executable, "-m", "keywordmoves.cli", "run", "google-search",
-     "--operation", "gsc-sites", "--option", "max_requests=1"],
-    env=dict(os.environ, SEARCH_CONSOLE_ACCESS_TOKEN=token),
-    check=False,
-)
-raise SystemExit(result.returncode)
-```
+Use the built-in optional store, which delegates to supported OS backends:
+Windows Credential Manager, macOS Keychain, or Linux Secret Service/KWallet.
+It never silently falls back to plaintext files. On a headless host without an
+available OS store, environment or explicit CLI credentials remain supported.
+See [credentials](credentials.md) for setup, limits and commands.
 
 Returned inventories are private account evidence. Keep them outside public
-repositories/distributions. A `.gitignore` helps prevent mistakes but is not
-permission to publish private files. Never print tokens, client secrets,
-refresh tokens or signed links in logs, reports, examples or support requests.
-Avoid permanent user/machine environment variables and plaintext fallback
-keyrings. Use a supported external OAuth library for renewal when required.
+repositories/distributions. Never print tokens, client secrets, refresh tokens
+or signed links in logs, reports, examples or support requests. OAuth renewal
+remains the responsibility of a supported external library; store an already
+authorized token and refresh it when necessary.
 
 ## Bounded verification and evidence
 
