@@ -157,6 +157,23 @@ keywordmoves run youtube --operation comments --option video_id=YOUR_VIDEO_ID `
 
 `YOUTUBE_CHANNEL_ID` supplies a fallback UC-prefixed channel ID for channel and
 Analytics operations. `channel_id`, `handle`, and `mine` are mutually exclusive.
+For a bounded identity/profile check without fetching uploads, use:
+
+```powershell
+keywordmoves run youtube --operation channel --option mine=true `
+  --option include_uploads=false --option max_requests=1
+```
+
+`include_uploads=false` returns the one accessible channel's metadata in
+`metadata.channel` after exactly one `channels.list` request. It works with
+`mine=true` (owner OAuth), `handle` or `channel_id`, needs no uploads playlist,
+and returns no video-derived keyword candidates or demand estimates. Missing
+or hidden counters stay missing; they are not converted to zero. The option is
+validated before network access and is rejected for other operations. Omit it
+for the existing bounded upload-analysis behaviour. The collection mode is
+retained in the evidence scope and metadata. An offline reproducible example is
+[`examples/youtube-channel-profile.py`](examples/youtube-channel-profile.py).
+
 Channel titles/descriptions, rounded/hidden subscriber counters and topic details
 are retained in metadata; channel/profile keyword research can also use
 `search_type=channel`. Upload analysis does not assign channel subscriber totals

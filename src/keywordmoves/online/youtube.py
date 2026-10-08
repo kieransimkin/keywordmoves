@@ -168,6 +168,10 @@ class YouTubePlugin:
         for key, default, low, high in (("pages", 1, 1, 10), ("reply_pages", 1, 1, 5)):
             integer(o, key, default, low, high)
         boolean(o, "include_replies")
+        if "include_uploads" in o:
+            if op != "channel":
+                raise ConfigurationError("include_uploads is only supported by the channel operation.")
+            boolean(o, "include_uploads", True)
         observed = datetime.now(timezone.utc).isoformat()
         if op in LOCAL_OPERATIONS:
             items, meta, notes = self._local(request, context, observed)
@@ -254,13 +258,23 @@ class YouTubePlugin:
                 if len(channels) != 1:
                     raise OnlineSourceError("Expected one accessible channel; no public uploads were inferred.")
                 channel = channels[0]
-                playlist = obj(obj(channel.get("contentDetails")).get("relatedPlaylists")).get("uploads")
-                if not playlist:
-                    raise OnlineSourceError("The channel response has no uploads playlist.")
                 extra["channel"] = {"id": channel["id"], "title": obj(channel.get("snippet")).get("title"),
                                     "description": obj(channel.get("snippet")).get("description"),
                                     "statistics": obj(channel.get("statistics")), "topicDetails": channel.get("topicDetails"),
                                     "subscriber_count_precision": "YouTube rounds subscriberCount to three significant figures; hidden is not zero."}
+                if not boolean(o, "include_uploads", True):
+                    params = {"channel_id": channel["id"], "include_uploads": False}
+                    return [], {**extra, "api_data": True, "source": source, "scope": scope(op, params),
+                                "record_kind": "channel", "uploads_included": False,
+                                "collection_parameters": params, "pagination": [],
+                                "endpoint_calls": dict(api.calls)}, [
+                        "Channel profile metadata only; no uploads, video samples or keyword demand are inferred.",
+                        "Subscriber counters may be rounded or hidden; missing values are not zero.",
+                        "API snapshots need refresh/deletion under the applicable terms.",
+                    ]
+                playlist = obj(obj(channel.get("contentDetails")).get("relatedPlaylists")).get("uploads")
+                if not playlist:
+                    raise OnlineSourceError("The channel response has no uploads playlist.")
                 # Resolve mine/handle to concrete channel ID before snapshot scoping.
                 params = {"channel_id": channel["id"], "playlist_id": playlist}
             else:
