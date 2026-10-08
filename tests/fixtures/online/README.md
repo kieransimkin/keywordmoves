@@ -1,5 +1,7 @@
 # Offline contract fixtures
 
+By [Kieran Simkin](https://kieransimkin.co.uk/), part of [DanceFlow](https://kieransimkin.co.uk/danceflow/).
+
 All responses in this directory are **synthetic**, authored to exercise the documented
 response shapes listed in `docs/online-sources.md`. They are not downloaded provider
 results, real volume observations, or demonstrations of live subscription access.

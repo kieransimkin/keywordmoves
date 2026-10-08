@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.2 - 2026-10-08
+
+- Add an original tool-specific vector logo and PNG companion in the shared DanceFlow visual style.
+- Clarify package descriptions from reviewed documentation and KeywordMoves literal-source evidence, without claims of measured search demand.
+- Link package descriptions and READMEs to Kieran Simkin’s website and retain branding files in installable packages.
+
+
 ## 0.3.1 - 2026-10-07
 
 - Install the online extra in the full CI matrix so saved-HTML importer tests run with their declared dependencies.

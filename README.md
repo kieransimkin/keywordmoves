@@ -1,5 +1,12 @@
 # KeywordMoves
 
+[![KeywordMoves logo](https://raw.githubusercontent.com/kieransimkin/keywordmoves/v0.3.2/docs/branding/logo.png)](https://kieransimkin.co.uk/danceflow/)
+
+By **[Kieran Simkin](https://kieransimkin.co.uk/)** · [DanceFlow ecosystem](https://kieransimkin.co.uk/danceflow/) · [Vector logo and usage guide](docs/branding/README.md).
+
+Source-specific keyword research, local phrase extraction and search-evidence imports. https://kieransimkin.co.uk/
+
+
 KeywordMoves is the keyword-discovery and search-evidence layer in Kieran
 Simkin's DanceFlow ecosystem. It provides small, composable Python plugins for
 generating keywords, finding related language, and attaching clearly labelled
