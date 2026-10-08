@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.5 - 2026-10-08
+
+- Add explicit agent capability, improvement, validation and upstream PR guidance to the README and contributor instructions.
+
 ## 0.4.4 - 8 October 2026
 
 - Added accurate privacy and use notices for the maintainer's private read-only
