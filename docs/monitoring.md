@@ -221,6 +221,12 @@ Collection needs the online extra and legitimately authorised credentials from
 the environment. It does not authorise OAuth setup, app review, access requests
 or platform terms. Account eligibility needs an authorised smoke test.
 
+Use the [authenticated-access guide](authenticated-access.md) before configuring
+live readers. YouTube Analytics requires both `youtube.readonly` and
+`yt-analytics.readonly`; Search Console uses its separate `webmasters.readonly`
+scope. Browser sign-in, connector access and local API authorization are
+independent states. Credentials never belong in the evidence store or a plan.
+
 Paid providers, remote jobs, experimental browser endpoints and unsupported APIs
 are excluded. Use their separately approved operations or file imports.
 

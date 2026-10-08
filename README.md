@@ -391,6 +391,10 @@ background job, paid request or account setup starts automatically.
 
 ## Current limitations and integration notes
 
+The [authenticated-access guide](docs/authenticated-access.md) documents the
+required first-party read scopes, secure Windows credential injection, bounded
+smoke checks and separate browser, connector and local API access states.
+
 - Python 3.10–3.13 is supported; monitoring uses standard CPython SQLite support. Optional NLP and provider integrations need their documented extras and source permissions.
 - Source text frequency, semantic relevance, search-result samples, platform observations and provider estimates answer different questions. They are not a universal ranking score.
 - Literal extraction preserves contiguous Unicode phrases and source offsets. Its English boundary stopwords are not a language-aware tokenizer; review other languages explicitly.

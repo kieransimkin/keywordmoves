@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.1 - 8 October 2026
+
+- Corrected YouTube Analytics setup to require both `youtube.readonly` and
+  `yt-analytics.readonly`, following the current `reports.query` contract.
+- Added an authenticated-access guide with separate browser/connector/API
+  evidence states, secure Windows credential injection, first-party scope
+  boundaries and finite read-only smoke examples.
+- Linked collector setup to the credential guide. OAuth creation, consent,
+  renewal, platform approval and credentials remain external to KeywordMoves;
+  no account data or credentials are bundled.
+
 ## 0.4.0 — 8 October 2026
 
 - Import established reviewed browser-observation labels without treating sampled language as demand; verify bounded local capture hashes with separate database status.

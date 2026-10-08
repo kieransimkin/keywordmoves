@@ -191,10 +191,16 @@ calling token. There is no private timedtext/Innertube workaround [11,12].
 
 ### Authorised Analytics API
 
-These routes require a channel-owner token with
-`https://www.googleapis.com/auth/yt-analytics.readonly`; monetary access is not
-requested. Set `YOUTUBE_ACCESS_TOKEN` and `YOUTUBE_CHANNEL_ID`, and provide
-`start_date` / `end_date` as ISO dates [13,14].
+These routes require a channel-owner OAuth token with both
+`https://www.googleapis.com/auth/youtube.readonly` and
+`https://www.googleapis.com/auth/yt-analytics.readonly`. The current
+`reports.query` contract requires the additional YouTube read scope; the
+Analytics read scope alone is insufficient. Monetary access is not requested.
+Set `YOUTUBE_ACCESS_TOKEN` and `YOUTUBE_CHANNEL_ID`, and provide
+`start_date` / `end_date` as ISO dates [13,14,29]. See
+[authenticated access](authenticated-access.md) for external consent, secure
+credential injection and bounded verification. A Studio or vidIQ sign-in does
+not create a token for this local client.
 
 | Operation | Native report |
 | --- | --- |
@@ -533,3 +539,4 @@ recheck contracts before live deployment. Source statements here are paraphrased
 26. [TubeBuddy Keyword Explorer](https://www.tubebuddy.com/tools/keyword-explorer/), [Search Explorer](https://www.tubebuddy.com/tools/search-explorer/)
 27. [Ahrefs YouTube Keyword Tool](https://ahrefs.com/youtube-keyword-tool)
 28. [YouTube hashtag help](https://support.google.com/youtube/answer/6390658?hl=en)
+29. [Analytics reports.query and required scopes](https://developers.google.com/youtube/analytics/reference/reports/query), rechecked 8 October 2026.
