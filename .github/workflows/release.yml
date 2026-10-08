@@ -1,0 +1,63 @@
+name: Publish checked release packages to PyPI
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing validated GitHub release tag vMAJOR.MINOR.PATCH
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: pypi-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+jobs:
+  pypi:
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      TAG_NAME: ${{ github.event.release.tag_name || inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Validate requested immutable tag
+        run: '[[ "$TAG_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]'
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TAG_NAME }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Download already tested GitHub release assets
+        run: gh release download "$TAG_NAME" --repo "$GITHUB_REPOSITORY" --dir release-dist --pattern '*.whl' --pattern '*.tar.gz' --pattern SHA256SUMS.txt
+      - name: Verify source, package versions and exact published bytes
+        run: |
+          test "$(git rev-parse HEAD)" = "$(git rev-parse "refs/tags/$TAG_NAME^{commit}")"
+          (cd release-dist && sha256sum --check SHA256SUMS.txt)
+          python - <<'PY'
+          import os, pathlib, tomllib, zipfile, tarfile, email
+          project=tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']
+          assert project['name']=='keywordmoves' and 'v'+project['version']==os.environ['TAG_NAME']
+          root=pathlib.Path('release-dist')
+          wheels=list(root.glob('*.whl')); sources=list(root.glob('*.tar.gz'))
+          assert len(wheels)==len(sources)==1
+          with zipfile.ZipFile(wheels[0]) as z:
+              entries=[n for n in z.namelist() if n.endswith('.dist-info/METADATA')]
+              assert len(entries)==1
+              wheel_meta=email.message_from_bytes(z.read(entries[0]))
+          with tarfile.open(sources[0],'r:gz') as t:
+              source_meta=email.message_from_bytes(t.extractfile('keywordmoves-'+project['version']+'/PKG-INFO').read())
+          for metadata in [wheel_meta,source_meta]:
+              assert metadata['Name']==project['name'] and metadata['Version']==project['version']
+          PY
+          mkdir pypi-dist
+          cp release-dist/*.whl release-dist/*.tar.gz pypi-dist/
+          python -m pip install twine
+          python -m twine check --strict pypi-dist/*
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: pypi-dist/
