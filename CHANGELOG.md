@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.4.0 — 8 October 2026
+
+- Import established reviewed browser-observation labels without treating sampled language as demand; verify bounded local capture hashes with separate database status.
+- Added private SQLite watchlists, hashed input captures, source-specific
+  history, coverage/freshness reports, local change alerts and acknowledgement.
+- Added due plans and exact-plan opt-in composition of existing first-party
+  readers, with transactional per-account request reservations, no paid routes,
+  no retry and explicit interrupted-run recovery.
+- Added reviewed CSV imports with explicit platform/metric mappings, preserving
+  zero, missing, rounded/censored and qualitative values separately.
+- Corrected Trends related-query deduplication and metric units: Top indices,
+  Rising percentages and Breakout labels remain distinct. Added the shared
+  Google Search related-export route.
+- Preserved censored/partial interest-over-time points without inventing exact
+  summary values, including explicit YouTube search-property scope.
+- Added retention cleanup, integrity checks, safe local HTML reporting, adopter
+  documentation and a reproducible synthetic twelve-platform example.
+
+Migration: related-query metrics now distinguish related_top/index_0_100,
+related_rising/percent_growth and related_rising_breakout/growth_label. The same
+phrase may appear in both Top and Rising; related candidates have no score.
+Interest series containing censored/missing/partial points retain their raw
+points but no exact mean/peak summary. No campaign register is modified.
+
 ## 0.3.2 - 2026-10-08
 
 - Add an original tool-specific vector logo and PNG companion in the shared DanceFlow visual style.

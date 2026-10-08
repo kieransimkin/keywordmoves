@@ -61,7 +61,7 @@ associated evidence, plus report context such as dates, filters, location and
 device. Equal counts from different pages are not silently treated as the same
 underlying observation; the top-level evidence list is a union, not a sum.
 
-## Operation matrix: 34 implemented operations
+## Operation matrix: 35 implemented operations
 
 | Operation | Source or input | Purpose |
 | --- | --- | --- |
@@ -656,3 +656,7 @@ claim that each linked product/endpoint has a live smoke-tested integration.
 Existing generic adapters and their research are documented separately in
 [online-sources.md](online-sources.md); local keyword proposal methods are in the
 spaCy, NLTK and KeyBERT guides.
+
+## Related Trends CSV exports
+
+Use **trends-related-import** with country, observed_at, seed_keyword, scope, window, category and search_property to import a reviewed Top/Rising CSV through the shared Google Trends parser. Top indices, Rising percentages and Breakout labels remain distinct; both sections retain the same phrase when present. There is no network request or normalised demand score. See [monitoring](monitoring.md) for comparison context and [native-export](native-export.md) for other reviewed files.

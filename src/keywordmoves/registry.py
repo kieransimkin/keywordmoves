@@ -48,6 +48,7 @@ class _Registry(Generic[T]):
 def _keyword_builtins() -> dict[str, Callable[[], Any]]:
     from .builtin.google_trends import GoogleTrendsPlugin
     from .builtin.keybert_keywords import KeyBERTKeywordPlugin
+    from .builtin.native_export import NativeExportPlugin
     from .builtin.nltk_keywords import NLTKKeywordPlugin
     from .builtin.observed_evidence import ObservedEvidencePlugin
     from .builtin.spacy_keywords import SpacyKeywordPlugin
@@ -58,6 +59,7 @@ def _keyword_builtins() -> dict[str, Callable[[], Any]]:
         "google-trends": GoogleTrendsPlugin,
         "keybert": KeyBERTKeywordPlugin,
         "nltk": NLTKKeywordPlugin,
+        "native-export": NativeExportPlugin,
         "observed-evidence": ObservedEvidencePlugin,
         "spacy": SpacyKeywordPlugin,
         "text-library": TextLibraryPlugin,

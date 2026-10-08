@@ -30,6 +30,7 @@ by name. It must not import or silently select a model provider of its own.
 | `google-trends` | keyword | Imports Google Trends interest and related-query CSV exports, preserving the distinction between relative index values and absolute search volume. |
 | `keybert` | keyword | Ranks literal reference-text phrases with local sentence embeddings; supports cosine similarity, MMR and Max Sum selection. No generative LLM required. |
 | `nltk` | keyword | Extracts proper nouns, grammar-based noun chunks, named entities and keyphrases locally with NLTK. No LLM required. |
+| `native-export` | keyword | Imports reviewed platform CSV reports with explicit columns, metric units and missing/censored states. |
 | `observed-evidence` | keyword | Validates and imports dated browser, account and public-tool observations without scraping authenticated or private interfaces. |
 | `spacy` | keyword | Extracts proper nouns, noun chunks, named entities and useful noun/adjective phrases from reference text with a local spaCy pipeline. No LLM required. |
 | `text-library` | keyword | Extracts contiguous Unicode phrases and source spans with `extract-literal`, retains legacy local associations, or asks an explicitly selected LLM for semantic proposals. |
@@ -359,12 +360,43 @@ updating the canonical My Songs keyword register. It keeps KeywordMoves
 candidate generation separate from external demand evidence, requires explicit
 LLM selection, and preserves the register's evidence and lifecycle semantics.
 
+## Monitor keyword evidence over time
+
+Use private watchlists and a persistent SQLite history to track source-specific
+keyword evidence, missing coverage, stale reports and collection failures.
+Compatible measurements can produce local change alerts; suggestions, rounded
+estimates and differently normalised indices never become one demand score.
+
+~~~powershell
+keywordmoves monitor --store ./private/evidence.sqlite init
+keywordmoves monitor --store ./private/evidence.sqlite watch --input ./watches.json
+keywordmoves monitor --store ./private/evidence.sqlite import --input ./observations.json
+keywordmoves monitor --store ./private/evidence.sqlite report --output ./private/coverage.html
+~~~
+
+[Monitoring guide](docs/monitoring.md) covers histories, provenance, alerts,
+due plans, opt-in bounded first-party collection, shared account quotas and
+retention. [Native CSV exports](docs/native-export.md) covers explicit mappings
+and the twelve-platform coverage matrix. A public-safe synthetic demo is
+included in the installed package:
+
+~~~powershell
+python -m keywordmoves.monitoring.demo --output-dir ./demo-private
+~~~
+
+Monitoring and import are available without network/NLP extras. Collection
+composes existing Google Search Console, YouTube Analytics and Bing Webmaster
+readers; real access still requires an authorised account smoke test. No
+background job, paid request or account setup starts automatically.
+
 ## Current limitations and integration notes
 
-- Python 3.10–3.13 is supported. Optional NLP and provider integrations need their documented extras and source permissions.
+- Python 3.10–3.13 is supported; monitoring uses standard CPython SQLite support. Optional NLP and provider integrations need their documented extras and source permissions.
 - Source text frequency, semantic relevance, search-result samples, platform observations and provider estimates answer different questions. They are not a universal ranking score.
 - Literal extraction preserves contiguous Unicode phrases and source offsets. Its English boundary stopwords are not a language-aware tokenizer; review other languages explicitly.
 - Browser-observation capture paths and hashes are supplied by the caller. The importer preserves their lineage but does not certify the source capture.
 - Online integrations require the access, permissions and charge limits documented in their module guides. A local result limit is not a billing ceiling.
+
+- Monitoring databases and reports can contain private account data; keep them outside public source/packages. Quotas cover only clients sharing the same store and account label.
 
 See [literal extraction](docs/literal-text.md) and [reviewed browser observations](docs/browser-observations.md) for the new operations and reproducible examples.

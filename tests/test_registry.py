@@ -3,7 +3,7 @@ from keywordmoves.registry import LLMRegistry, PluginRegistry
 
 
 def test_builtin_keyword_plugins_are_discoverable():
-    expected = {"google-trends", "keybert", "nltk", "observed-evidence", "spacy", "text-library"}
+    expected = {"google-trends", "native-export", "keybert", "nltk", "observed-evidence", "spacy", "text-library"}
     assert set(PluginRegistry().names()) == expected | set(online_factories())
 
 

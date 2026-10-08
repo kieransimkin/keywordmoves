@@ -11,3 +11,11 @@ __pycache__/
 *.py[cod]
 .keywordmoves-cache/
 .tmp/
+
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+*.sqlite3-journal
+*.db
+*.db-journal
+.monitor-private/

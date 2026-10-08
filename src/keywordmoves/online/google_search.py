@@ -23,7 +23,7 @@ from .websites import check_robots, public_url
 GSC_REPORT_OPERATIONS = ("gsc-query", "gsc-pages", "gsc-query-pages", "gsc-opportunities", "gsc-overlap")
 GSC_INVENTORY_OPERATIONS = ("gsc-sites", "gsc-sitemaps", "gsc-inspect")
 LOCAL_OPERATIONS = ("gsc-import", "gsc-compare", "gsc-bulk-sql", "import-serp", "import-serp-html", "serp-compare",
-                    "import-observations", "observed-compare", "trends-import", "combine", "keyword-gap")
+                    "import-observations", "observed-compare", "trends-import", "trends-related-import", "combine", "keyword-gap")
 NETWORK_OPERATIONS = ("serp", "competition", "rank-check", "autocomplete", "questions", "suggestions", "ideas", "metrics",
                       "ads-url-ideas", "competitor-keywords", "backlinks", "trends", "custom-search", "pagespeed", "page-audit")
 # Shared, documented options plus provider options supported by existing adapters.
@@ -33,7 +33,7 @@ site_url start_date end_date dimensions search_type data_state aggregation query
 filters_json page_size pages max_rows start_row access_token language min_impressions min_position max_position max_ctr target_ctr
 scope source observed_at table top_n target_host provider location location_code expand expansion_offset max_queries
 allow_unofficial api_key next_page_token existing_customer cx target include_subdomains backlink_status offset timeframe data_type category
-seed_type url customer_id api_version location_codes language_id developer_token login_customer_id page_token strategy
+seed_keyword section window normalization_id seed_type url customer_id api_version location_codes language_id developer_token login_customer_id page_token strategy
 organic_selector title_selector link_selector snippet_selector rank_attribute search_property
 login password max_pages metrics currency network metrics_source suggestion_type match_mode sandbox depth fresh
 sort_by sort_order database
@@ -203,6 +203,16 @@ class GoogleSearchPlugin:
             imports.require_files(request, 2)
             before, after = [obj(imports.read_json(p, o)) for p in request.inputs]
             return imports.compare_observations(before, after, observed), {}, ["Only compatible identities appearing in both snapshots are compared."]
+        if operation == "trends-related-import":
+            from ..builtin.google_trends import GoogleTrendsPlugin
+            selected = {key: o[key] for key in ("observed_at", "scope", "window", "category",
+                        "search_property", "seed_keyword", "section", "normalization_id") if key in o}
+            if "country" in o:
+                selected["geography"] = o["country"]
+            result = GoogleTrendsPlugin().run(
+                PluginRequest("import-related", inputs=request.inputs, options=selected),
+                ExecutionContext(llms=None))
+            return list(result.keywords), dict(result.metadata), list(result.notes)
         if operation == "trends-import":
             items, meta = imports.trends_import(request)
             return items, meta, []

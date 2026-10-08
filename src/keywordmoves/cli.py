@@ -36,7 +36,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="keywordmoves",
         description="Modular keyword discovery and evidence analysis.",
     )
-    parser.add_argument("--version", action="version", version="%(prog)s 0.3.2")
+    parser.add_argument("--version", action="version", version="%(prog)s 0.4.0")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     plugins = subparsers.add_parser("plugins", help="List keyword or LLM plugins.")
@@ -58,6 +58,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     run.add_argument("--option", action="append", type=_option, default=[])
     run.add_argument("--format", choices=("json", "text"), default="json")
+    from .monitoring.cli import configure
+
+    configure(subparsers)
     return parser
 
 
@@ -86,6 +89,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     keyword_plugins = PluginRegistry()
     llm_plugins = LLMRegistry()
     try:
+        if args.command == "monitor":
+            from .monitoring.cli import dispatch
+
+            return dispatch(args)
         if args.command == "plugins":
             items: list[dict[str, Any]] = []
             if args.kind in {"keyword", "all"}:
