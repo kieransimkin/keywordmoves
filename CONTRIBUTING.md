@@ -12,3 +12,5 @@ Maintainers review accepted changes, reserve a fresh version and publish a match
 Website: [https://kieransimkin.co.uk/danceflow/](https://kieransimkin.co.uk/danceflow/).
 
 Tagged releases automatically run the GitHub release workflow and configured registry publication, using the same tested artifacts. Initial registry eligibility, approval and credentials remain explicit setup gates. Registry retries must preserve existing version bytes.
+
+For a tag whose GitHub release is missing, dispatch `release.yml` from reviewed main with its exact `tag` and `build_release=true`. The job checks out that tag, runs the full default suite with declared online dependencies, builds/checks packages, and creates the missing immutable release before PyPI. Leave `build_release` false for a registry-only retry of existing verified assets.
