@@ -413,3 +413,5 @@ smoke checks and separate browser, connector and local API access states.
 - Monitoring databases and reports can contain private account data; keep them outside public source/packages. Quotas cover only clients sharing the same store and account label.
 
 See [literal extraction](docs/literal-text.md) and [reviewed browser observations](docs/browser-observations.md) for the new operations and reproducible examples.
+
+Authenticated app setup: [client notices and policy boundaries](docs/platform-client-notices.md).

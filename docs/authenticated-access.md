@@ -18,6 +18,13 @@ Keep three independently verified states:
   and a bounded first-party request succeeds. Browser/connector success does
   not prove this state.
 
+## App notices and consent
+
+Read [platform-client notices](platform-client-notices.md) before configuring
+an app. The maintainer's private client has separate published privacy/use
+notices; other operators need their own accurate notices and approvals.
+Account consent, terms acceptance and API entitlement are separate states.
+
 ## First-party credentials and scope
 
 | Reader | Local environment | Minimum applicable access |

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.4 - 8 October 2026
+
+- Added accurate privacy and use notices for the maintainer's private read-only
+  platform client, with scope, local storage, retention, revocation and contact
+  boundaries. Other operators must supply their own deployment's notices.
+- Added a reusable app-notice setup guide and linked it from authenticated
+  access documentation. Credentials, private account evidence and OAuth
+  implementations remain external; no reader or credential behavior changed.
+
 ## 0.4.3 - 8 October 2026
 
 - Added opt-in cross-platform OS credential storage through the optional
