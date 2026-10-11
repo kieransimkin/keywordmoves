@@ -31,8 +31,15 @@ Project website: [https://kieransimkin.co.uk/danceflow/](https://kieransimkin.co
 
 ## Current plugins
 
+See [multi-source research](docs/multi-source-research.md) for the source/access
+inventory, explicit research plans and source-native evidence limits.
+
 | Plugin | Kind | What it does |
 | --- | --- | --- |
+| `research-batch` | keyword | Validates and runs explicit bounded multi-source plans, preserving subjects, units and unavailable tasks. |
+| `seranking` | keyword | Regional third-party keyword estimates and related/question/long-tail language with a documented credit guard; account access requires separate approval. |
+| `wikimedia-pageviews` | keyword | Article-reading attention over declared completed daily windows; no keyword-demand interpretation. |
+| `itunes-catalog` | keyword | Apple song-title, credited artist and genre context without popularity metrics or media downloads. |
 | `google-search` | keyword | Google Search Console, Trends exports, search observations and page audits with source-specific metrics. |
 | `bing-search` | keyword | Bing Webmaster, reviewed search results and keyword planning evidence. |
 | `youtube`, `tiktok`, `instagram`, `reddit` | keyword | Separate platform workbenches for authorised exports, native observations, local reference text and supported providers. Read each module's access and metric limits. |

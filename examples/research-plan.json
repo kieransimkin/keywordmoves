@@ -1,0 +1,7 @@
+{
+  "schema": "keywordmoves-research-batch/v1",
+  "tasks": [
+    {"id": "language", "subject": "Example song", "plugin": "datamuse", "operation": "related", "keywords": ["friendship"], "options": {"topics": "music,song", "limit": 10}},
+    {"id": "topic", "subject": "Example song", "plugin": "wikipedia", "operation": "suggestions", "keywords": ["Protest song"], "options": {"limit": 5, "language": "en"}}
+  ]
+}

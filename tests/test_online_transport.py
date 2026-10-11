@@ -41,7 +41,8 @@ raise SystemExit(main(['plugins','--json']))
                             env={**os.environ,"PYTHONPATH":str(root/"src")},capture_output=True,text=True,check=True)
     names = {v["name"] for v in json.loads(result.stdout) if v["kind"] == "keyword"}
     assert set(factories()).issubset(names)
-    assert len(factories()) == 24
+    assert len(factories()) == 27
+    assert {"seranking", "wikimedia-pageviews", "itunes-catalog"} <= names
     assert "bing-search" in names
     assert "reddit" in names
     assert "instagram" in names

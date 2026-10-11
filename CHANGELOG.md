@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.0 - 2026-10-11
+
+- Add an explicit multi-source research runner with offline plan validation,
+  per-subject provenance, source-native units, unavailable-task records and no
+  automatic retries, seed expansion or paid fallback.
+- Add SE Ranking regional keyword/related/question/long-tail contracts with an
+  exact-request opt-in and documented credit-bound guard; synthetic tests only.
+- Add live-checked Wikimedia article attention and Apple iTunes catalogue
+  context, retaining their limits without claiming keyword popularity.
+- Add Datamuse music-topic/context hints and English/Spanish vocabulary support.
+- Derive CLI version output from the package version and document source access,
+  evidence limits, target review, reproducible plans and integration recovery.
+
 ## 0.4.6 - 2026-10-09
 
 - Install the online extra in the release build so saved HTML-import tests have their declared parser/HTTP dependencies.
