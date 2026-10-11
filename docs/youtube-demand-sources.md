@@ -3,6 +3,11 @@
 Checked against official documentation on 11 October 2026. Access, estimates
 and pricing can change; preserve source, geography, dates, units and limitations.
 
+The expanded [free-source audit](free-youtube-volume-sources.md) documents the
+working public vidIQ overview import and the additional services checked.
+Featured US monthly estimates are available through that reviewed public feed;
+no new independent worldwide provider is claimed.
+
 | Source | Access | Measurement | Main limit |
 |---|---|---|---|
 | Google Trends, YouTube Search | Free native UI and CSV export | Sampled relative interest, 0..100 | No absolute query counts; comparison sets change normalisation |
