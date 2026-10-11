@@ -23,6 +23,7 @@ scope, access rights, freshness and audience intent are reviewed.
 | Wikimedia Pageviews | `wikimedia-pageviews` | Human-classified article-reading attention over a complete declared daily window; not keyword searches, song demand or geography. |
 | Apple iTunes Search | `itunes-catalog` | Song-title, credited artist and genre context for a storefront; no popularity, affiliation or audience inference. |
 | SE Ranking | `seranking` | Documented regional estimates, questions/related/similar terms and language-only long tails; explicit paid credit guard. |
+| vidIQ | `vidiq` | Authorised saved JSON/native reviewed keyword captures; offline imports retain censoring, worldwide/country estimates and provider dates. No live scraper or independently reproduced estimate model. |
 | Last.fm / MusicBrainz / ListenBrainz / Spotify / Apple Music | Evaluate official API or permitted exports before integration | Potential music tags, catalogue identity and listening context. Credentials, eligibility, commercial-use terms, rates and licensing are separate gates; no new live integration is claimed here. |
 
 This list is a routing inventory, not a claim that every source has been accessed
@@ -50,6 +51,8 @@ pretend to enforce tariffs it cannot calculate. Browser-only sources require
 dated reviewed captures/exports, not automation through this runner.
 
 Every result retains task identity, subject, original source result and units.
+Offline `vidiq` and `candidate-focus` tasks also compose here; read their
+[import and phrase-review contract](vidiq-benchmark.md).
 Known source failures become unavailable tasks with their error class, without
 retaining arbitrary upstream error bodies. Empty results remain no-candidates;
 they do not establish zero demand. There is no automatic seed expansion, retry,

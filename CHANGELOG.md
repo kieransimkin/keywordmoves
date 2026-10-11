@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.1 - 2026-10-11
+
+- Add offline vidIQ keyword-result imports, retaining worldwide/country metrics,
+  censored display bounds, missing values and distinct provider metric dates.
+- Add explainable candidate phrase filters and Unicode matching terms, preserving
+  source evidence and recording exclusions, input/settings hashes and omissions.
+- Compose these offline plugins with research batches, with regression tests,
+  an executable synthetic example and fair-comparison guidance.
+
 ## 0.5.0 - 2026-10-11
 
 - Add an explicit multi-source research runner with offline plan validation,
