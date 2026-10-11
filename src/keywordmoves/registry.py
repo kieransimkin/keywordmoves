@@ -56,11 +56,13 @@ def _keyword_builtins() -> dict[str, Callable[[], Any]]:
     from .builtin.spacy_keywords import SpacyKeywordPlugin
     from .builtin.text_library import TextLibraryPlugin
     from .builtin.vidiq import VidiqPlugin
+    from .builtin.ytkeywordtool import YTKeywordToolPlugin
     from .online import factories as online_factories
 
     return {
         "candidate-focus": CandidateFocusPlugin,
         "vidiq": VidiqPlugin,
+        "ytkeywordtool": YTKeywordToolPlugin,
         "google-trends": GoogleTrendsPlugin,
         "keybert": KeyBERTKeywordPlugin,
         "nltk": NLTKKeywordPlugin,

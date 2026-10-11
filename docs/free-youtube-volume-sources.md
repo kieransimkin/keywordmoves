@@ -1,5 +1,12 @@
 # Free YouTube search-volume source audit
 
+For later native testing of suggestion/result tools and the additional working
+imports, see [free public-source modules](free-public-source-modules.md). That
+follow-up holds Navid and Keyword Tool Dominator's autocomplete claims after
+control-string expansions, records unavailable Rapidtags/DigestSEO routes, adds
+YT Keyword Tool's suggestion importer, and enables free Keywords Everywhere
+Google planning context without treating it as YouTube volume.
+
 Reviewed 11 October 2026. Free access and reliable measurement are separate
 questions. This audit found another usable public access route to vidIQ's
 provider estimates. No additional independent provider passed the current
