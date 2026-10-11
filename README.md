@@ -298,6 +298,13 @@ options, hosted-data behaviour and troubleshooting.
 
 ## Online keyword sources
 
+Free public collection now connects the reviewed sources to their parsers:
+`ytkeywordtool/collect-public` queries the public free form without an HTML
+import, and the packaged connected-browser helper collects Keywords Everywhere
+Google planning context automatically. A robots-respecting `vidiq/collect-public`
+route reports access failures explicitly. See [automatic free collection](docs/automatic-free-collection.md)
+for commands, browser integration, quota bounds and current live limits.
+
 Install the optional networking and HTML parsers:
 
 ```powershell

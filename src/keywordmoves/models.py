@@ -74,4 +74,5 @@ class LLMResult:
 class ExecutionContext:
     llms: Any
     cache_dir: Path | None = None
+    public_browser: Any = None
 

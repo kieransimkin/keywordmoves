@@ -3,7 +3,7 @@ include README.md
 include CHANGELOG.md
 recursive-include docs *.md
 recursive-include skills *.md *.yaml
-recursive-include tests *.py *.txt *.csv *.json *.html *.md
+recursive-include tests *.py *.txt *.csv *.json *.html *.md *.mjs
 
 recursive-include docs/branding *.svg *.png *.md
 

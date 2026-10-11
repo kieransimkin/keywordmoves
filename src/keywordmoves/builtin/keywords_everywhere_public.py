@@ -23,10 +23,10 @@ def number(display, *, percent=False):
     return finite(float(value.replace(",", "")), "Google metric")
 
 
-def import_public_html(request):
+def import_public_html(request, *, captured_bytes=None):
     if request.keywords:
         raise ConfigurationError("Keywords Everywhere's public import uses the captured rows, not a live seed request.")
-    doc, observed, metadata = visible_document(request, URL, {"source_url", "observed_at", "country", "currency"})
+    doc, observed, metadata = visible_document(request, URL, {"source_url", "observed_at", "country", "currency"}, captured_bytes=captured_bytes)
     country, currency = request.options.get("country"), request.options.get("currency")
     if not isinstance(country, str) or not re.fullmatch(r"[A-Z]{2}|GLB", country):
         raise ConfigurationError("Confirm the reviewed Google volume country, or GLB for Global.")

@@ -9,18 +9,24 @@ from ..monitoring.validation import now_stamp, stamp
 from ..online.youtube_imports import soup
 
 
-def visible_document(request, url, options):
-    if len(request.inputs) != 1 or set(request.options) - options:
+def visible_document(request, url, options, *, captured_bytes=None):
+    if (len(request.inputs) != (1 if captured_bytes is None else 0)
+        or set(request.options) - options):
         raise ConfigurationError("Use one reviewed HTML file and the documented offline options.")
     if request.options.get("source_url") != url:
         raise ConfigurationError("Confirm the exact official source_url for this capture.")
     observed = stamp(request.options.get("observed_at"))
     if observed > now_stamp():
         raise InputError("The capture date cannot be in the future.")
-    path = Path(request.inputs[0])
+    path = Path(request.inputs[0]) if captured_bytes is None else None
     try:
-        with path.open("rb") as handle:
-            raw = handle.read(5_000_001)
+        if path is not None:
+            with path.open("rb") as handle:
+                raw = handle.read(5_000_001)
+        else:
+            raw = captured_bytes
+        if not isinstance(raw, bytes):
+            raise InputError("Automatic captures must supply UTF-8 bytes.")
         if len(raw) > 5_000_000:
             raise InputError("Reviewed HTML exceeds the 5 MB bound.")
         document = soup(raw.decode("utf-8-sig"))
@@ -38,7 +44,7 @@ def visible_document(request, url, options):
             or "display:none" in style or "visibility:hidden" in style):
             node.decompose()
     return document, observed, {
-        "input_path": str(path.resolve()), "input_sha256": hashlib.sha256(raw).hexdigest(),
+        "input_path": str(path.resolve()) if path else None, "input_sha256": hashlib.sha256(raw).hexdigest(),
         "source_url": url, "observed_at": observed, "network_requests": 0,
         "access": "reviewed public HTML capture", "provider_updated_at": None,
         "freshness": "provider measurement date unknown",

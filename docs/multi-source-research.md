@@ -1,5 +1,12 @@
 # Multi-source research
 
+Since 0.5.5, [automatic free collection](automatic-free-collection.md) removes
+manual HTML imports for the YT public-form JSON and supported browser routes.
+`research-batch` accepts free `ytkeywordtool/collect-public`,
+`vidiq/collect-public`, and both `collect-browser` source operations. Browser
+tasks require an authorised context driver. Paid Keywords Everywhere `metrics`
+remains excluded; access failures are retained as unavailable tasks.
+
 Reviewed YT Keyword Tool suggestions and free Keywords Everywhere Google planning
 context compose offline through `import-public-html`. The batch contract rejects
 live Keywords Everywhere metrics requests. See [free public-source modules](free-public-source-modules.md)

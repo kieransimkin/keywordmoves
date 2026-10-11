@@ -31,8 +31,8 @@ def _display(value, growth=False):
     return value if scale != 1 else nominal, nominal
 
 
-def import_public_html(request):
-    if request.keywords or len(request.inputs) != 1 or set(request.options) - OPTIONS:
+def import_public_html(request, *, captured_bytes=None):
+    if request.keywords or len(request.inputs) != (1 if captured_bytes is None else 0) or set(request.options) - OPTIONS:
         raise ConfigurationError("vidiq import-public-html requires one saved public widget/page and documented offline options.")
     observed = stamp(request.options.get("observed_at"))
     source_url = request.options.get("source_url")
@@ -41,11 +41,16 @@ def import_public_html(request):
     age = request.options.get("max_age_days", 30)
     if isinstance(age, bool) or not isinstance(age, int) or not 1 <= age <= 366:
         raise ConfigurationError("max_age_days must be an integer from 1 to 366.")
-    path = Path(request.inputs[0])
+    path = Path(request.inputs[0]) if captured_bytes is None else None
     try:
-        if path.stat().st_size > 5_000_000:
-            raise InputError("Public HTML import exceeds 5 MB.")
-        raw = path.read_bytes()
+        if path is not None:
+            if path.stat().st_size > 5_000_000:
+                raise InputError("Public HTML import exceeds 5 MB.")
+            raw = path.read_bytes()
+        else:
+            raw = captured_bytes
+        if not isinstance(raw, bytes):
+            raise InputError("Automatic captures must supply UTF-8 bytes.")
         if len(raw) > 5_000_000:
             raise InputError("Public HTML import exceeds 5 MB.")
         body = raw.decode("utf-8-sig")
@@ -134,7 +139,7 @@ def import_public_html(request):
         "Free public overview import only; no login, charge, API key or hidden endpoint.",
         "Top counts are US estimates. Rising geography is unspecified; seven-day growth is not monthly volume.",
         "Abbreviated displays stay rounded. Provider update dates are preserved; no independent model or arbitrary-query access.",
-    ), {"input_path": str(path.resolve()), "input_sha256": hashlib.sha256(raw).hexdigest(),
+    ), {"input_path": str(path.resolve()) if path else None, "input_sha256": hashlib.sha256(raw).hexdigest(),
         "network_requests": 0, "source_url": URL, "observed_at": observed,
         "provider_displayed_update": updated, "freshness": freshness, "row_count": len(items),
         "access": "reviewed public HTML capture", "independent_of_vidiq": False})

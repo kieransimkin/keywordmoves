@@ -134,7 +134,7 @@ def test_batch_composes_both_offline_modules_but_rejects_live_api(tmp_path):
     assert {k.metadata["platform"] for k in result.keywords} == {"Google", "YouTube"}
     tasks[1]["operation"] = "metrics"
     plan_path.write_text(json.dumps({"schema": "keywordmoves-research-batch/v1", "tasks": tasks}), "utf-8")
-    with pytest.raises(InputError, match="offline"):
+    with pytest.raises(InputError, match="metered"):
         PluginRegistry().get("research-batch").run(request, ExecutionContext(None))
 
 

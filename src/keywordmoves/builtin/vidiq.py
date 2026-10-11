@@ -61,10 +61,16 @@ def _payload(data):
 
 class VidiqPlugin:
     descriptor = PluginDescriptor("vidiq", "Import authorised vidIQ keyword JSON with dates, censoring and country metrics intact.",
-                                  ("import", "youtube", "provider-estimates"), ("import-json", "import-public-html"))
+                                  ("import", "youtube", "provider-estimates", "public-html"), ("import-json", "import-public-html", "collect-public"))
+
+    def __init__(self, *, transport=None):
+        self._transport = transport
 
     def run(self, request, context):
         del context
+        if request.operation == "collect-public":
+            from ..online.free_public import collect_vidiq
+            return collect_vidiq(request, self._transport)
         if request.operation == "import-public-html":
             from .vidiq_public import import_public_html
             return import_public_html(request)

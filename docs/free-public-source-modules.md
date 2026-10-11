@@ -1,9 +1,12 @@
 # Reviewed free public-source modules
 
-These modules import saved, reviewed browser HTML. They make no HTTP requests,
+The original operations import saved, reviewed browser HTML. They make no HTTP requests,
 create no accounts and spend no API credits. Install `keywordmoves[online]` for
 the HTML parser. Source capture remains a separate permitted browser operation;
-there is no hidden endpoint, auto-harvest or rate-limit workaround.
+there is no hidden endpoint or rate-limit workaround. Since 0.5.5,
+[automatic collectors](automatic-free-collection.md) also fetch YT public-form
+JSON and operate supported browser forms, handing results directly to the
+existing parsers. Manual HTML capture/import is optional for these routes.
 
 ## Working routes
 
