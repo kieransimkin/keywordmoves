@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import calendar
 import csv
 import hashlib
 import io
 import math
 import re
 from collections import defaultdict
+from datetime import date, timedelta
 from pathlib import Path
 from statistics import mean
 
@@ -18,6 +20,8 @@ from ..models import (
     PluginRequest,
     PluginResult,
 )
+from ..monitoring.validation import stamp
+from ..online.common import boolean
 
 
 def _rows(path: Path) -> tuple[list[list[str]], str]:
@@ -62,6 +66,22 @@ def _clean_series_name(value: str) -> str:
     return re.sub(r"\s*:\s*\([^)]*\)\s*$", "", value).strip()
 
 
+def _period_end(value: str, granularity: str) -> date:
+    try:
+        start = date.fromisoformat(value)
+        if value != start.isoformat():
+            raise ValueError
+        if granularity == "week":
+            return start + timedelta(days=6)
+        if granularity == "month":
+            if start.day != 1:
+                raise ValueError
+            return start.replace(day=calendar.monthrange(start.year, start.month)[1])
+        return start
+    except (ValueError, OverflowError) as exc:
+        raise InputError("Completed-period summaries need valid ISO period start dates.") from exc
+
+
 class GoogleTrendsPlugin:
     descriptor = PluginDescriptor(
         name="google-trends",
@@ -96,12 +116,25 @@ class GoogleTrendsPlugin:
         if len(header) < 2:
             raise InputError("The Google Trends interest export has no keyword series.")
         series: dict[str, list[dict]] = defaultdict(list)
+        completed_only = boolean(options, "completed_periods_only")
+        captured = None
+        if completed_only:
+            if header[0].casefold() not in {"week", "day", "month", "date"}:
+                raise ConfigurationError("Completed-period summaries support Week, Day, Date or Month exports.")
+            captured = date.fromisoformat(stamp(observed_at)[:10])
         partial = False
         for row in rows[index + 1:]:
             if not row or not any(row):
                 continue
             if len(row) != len(header) or not row[0]:
                 raise InputError("Malformed or truncated Trends interest row.")
+            row_partial = False
+            for column, raw in enumerate(row[1:], start=1):
+                if header[column].casefold() == "ispartial":
+                    if raw.casefold() not in {"true", "false"}:
+                        raise InputError("IsPartial must be true or false.")
+                    row_partial = row_partial or raw.casefold() == "true"
+            end = _period_end(row[0], header[0].casefold()) if completed_only else None
             for column, raw in enumerate(row[1:], start=1):
                 if header[column].casefold() == "ispartial":
                     if raw.casefold() not in {"true", "false"}:
@@ -114,14 +147,18 @@ class GoogleTrendsPlugin:
                 if not (censored or missing) and (
                         value is None or not 0 <= value <= 100 or "%" in raw):
                     raise InputError("Interest values must be finite 0..100 indices or explicit missing values.")
-                series[_clean_series_name(header[column])].append({
-                    "period": row[0], "raw_value": raw, "value": value, "censored": censored})
+                point = {"period": row[0], "raw_value": raw, "value": value, "censored": censored}
+                if completed_only:
+                    point.update(period_end=end.isoformat(), is_partial=row_partial,
+                                 eligible_for_summary=end < captured and not row_partial)
+                series[_clean_series_name(header[column])].append(point)
         candidates = []
         for phrase, points in series.items():
             if not phrase or not points:
                 continue
-            values = [point["value"] for point in points if point["value"] is not None]
-            complete = len(values) == len(points) and not partial
+            summary = [p for p in points if p.get("eligible_for_summary", True)]
+            values = [point["value"] for point in summary if point["value"] is not None]
+            complete = bool(summary) and len(values) == len(summary) and (completed_only or not partial)
             average = round(mean(values), 4) if complete else None
             peak = max(values) if complete else None
             evidence = (
@@ -141,6 +178,11 @@ class GoogleTrendsPlugin:
                     "series": points, "censored": any(point["censored"] for point in points),
                     "completeness": "complete" if complete else "partial",
                     "availability": "observed" if values else "no-data",
+                    **({"completed_periods_only": True, "summary_observations": len(summary),
+                        "excluded_incomplete_periods": len(points) - len(summary),
+                        "summary_window": {"start": min(p["period"] for p in summary),
+                                           "end": max(p["period_end"] for p in summary)} if summary else None}
+                       if completed_only else {}),
                     "platform": "YouTube" if options.get("search_property") == "youtube" else "Google",
                     "evidence_kind": "relative_interest",
                     **{key: options[key] for key in ("window", "scope", "category", "search_property",
@@ -154,6 +196,7 @@ class GoogleTrendsPlugin:
              "Censored, missing or partial series do not receive exact summary values."),
             {"source_file": str(path.resolve()), "source_sha256": options["source_sha256"],
              "observed_at": observed_at, "geography": geography,
+             "completed_periods_only": completed_only,
              **{key: options[key] for key in ("window", "scope", "category", "search_property",
                                              "normalization_id") if key in options}},
         )

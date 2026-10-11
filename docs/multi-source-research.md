@@ -1,5 +1,10 @@
 # Multi-source research
 
+Keyword Tool YouTube JSON can be composed offline with `keywordtool/import-json`.
+Live Keyword Tool routes are excluded from batches because they may be metered.
+See [YouTube demand sources](youtube-demand-sources.md) for required scope, dated
+monthly history, 12-month average estimates and free Trends export imports.
+
 Research date: 11 October 2026. KeywordMoves retains source-native evidence rather
 than averaging unrelated scores. More sources improve coverage only when their
 scope, access rights, freshness and audience intent are reviewed.

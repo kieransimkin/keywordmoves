@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.2 - 2026-10-11
+
+- Add opt-in completed-period Trends summaries while retaining every original
+  point, excluded periods and censored values, including YouTube Search exports.
+- Import authorised Keyword Tool YouTube JSON offline with worldwide/country
+  scope, monthly history, missing metrics and separate advertising proxies.
+- Support Keyword Tool's documented YouTube worldwide GLB API code; permit
+  offline imports in research batches while rejecting live metered routes.
+- Document free relative-interest sources versus paid absolute estimates, with
+  synthetic examples, bounded validation and no account or billing changes.
+
 ## 0.5.1 - 2026-10-11
 
 - Add offline vidIQ keyword-result imports, retaining worldwide/country metrics,
