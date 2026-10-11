@@ -39,7 +39,7 @@ inventory, explicit research plans and source-native evidence limits.
 
 | Plugin | Kind | What it does |
 | --- | --- | --- |
-| `vidiq` | keyword | Offline authorised keyword-result imports with worldwide/country estimates, censoring and provider dates intact. See [imports and comparisons](docs/vidiq-benchmark.md). |
+| `vidiq` | keyword | Offline authorised keyword-result imports and the free public overview, with country scope, rounding, censoring and provider dates intact. See [imports and comparisons](docs/vidiq-benchmark.md) and [free-source checks](docs/free-youtube-volume-sources.md). |
 | `candidate-focus` | keyword | Explainable literal phrase filtering and matching terms across saved source results; no combined demand score. |
 | `research-batch` | keyword | Validates and runs explicit bounded multi-source plans, preserving subjects, units and unavailable tasks. |
 | `seranking` | keyword | Regional third-party keyword estimates and related/question/long-tail language with a documented credit guard; account access requires separate approval. |

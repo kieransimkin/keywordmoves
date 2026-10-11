@@ -1,5 +1,9 @@
 # Multi-source research
 
+The free public vidIQ overview can be composed with `vidiq/import-public-html`.
+It preserves US rounded monthly displays separately from seven-day growth with
+unstated geography. See [free-source checks](free-youtube-volume-sources.md).
+
 Keyword Tool YouTube JSON can be composed offline with `keywordtool/import-json`.
 Live Keyword Tool routes are excluded from batches because they may be metered.
 See [YouTube demand sources](youtube-demand-sources.md) for required scope, dated

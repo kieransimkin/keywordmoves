@@ -61,10 +61,13 @@ def _payload(data):
 
 class VidiqPlugin:
     descriptor = PluginDescriptor("vidiq", "Import authorised vidIQ keyword JSON with dates, censoring and country metrics intact.",
-                                  ("import", "youtube", "provider-estimates"), ("import-json",))
+                                  ("import", "youtube", "provider-estimates"), ("import-json", "import-public-html"))
 
     def run(self, request, context):
         del context
+        if request.operation == "import-public-html":
+            from .vidiq_public import import_public_html
+            return import_public_html(request)
         if request.operation != "import-json" or len(request.inputs) != 1 or request.keywords:
             raise ConfigurationError("vidiq import-json requires exactly one saved JSON capture.")
         options = dict(request.options)

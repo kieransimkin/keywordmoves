@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.3 - 2026-10-11
+
+- Import the free public vidIQ keyword overview from reviewed rendered HTML,
+  preserving rounded US monthly displays, separate seven-day growth, source
+  dates, unknown scope/window details and stale captures without live requests.
+- Document the wider free-source audit and control checks, including rejected
+  numerical tools, Google-volume proxies, unavailable services and account gates.
+- Add synthetic regression coverage and an executable no-network example;
+  retain existing JSON imports and research-batch composition.
+
 ## 0.5.2 - 2026-10-11
 
 - Add opt-in completed-period Trends summaries while retaining every original

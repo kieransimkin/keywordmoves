@@ -1,5 +1,9 @@
 # Importing vidIQ and reviewing phrase fit
 
+For the free public keyword overview, use `vidiq import-public-html` after a
+reviewed native HTML capture. See [free-source checks](free-youtube-volume-sources.md)
+for rounded US estimates, displayed update dates and separate growth context.
+
 `vidiq import-json` is an offline importer for saved, authorised vidIQ MCP
 keyword results and explicitly reviewed browser captures. It has no web scraper,
 undocumented API, account access, paid calls or automatic research expansion.
