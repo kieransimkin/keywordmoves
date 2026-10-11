@@ -51,6 +51,7 @@ def _keyword_builtins() -> dict[str, Callable[[], Any]]:
     from .builtin.native_export import NativeExportPlugin
     from .builtin.nltk_keywords import NLTKKeywordPlugin
     from .builtin.observed_evidence import ObservedEvidencePlugin
+    from .builtin.research_batch import ResearchBatchPlugin
     from .builtin.spacy_keywords import SpacyKeywordPlugin
     from .builtin.text_library import TextLibraryPlugin
     from .online import factories as online_factories
@@ -61,6 +62,7 @@ def _keyword_builtins() -> dict[str, Callable[[], Any]]:
         "nltk": NLTKKeywordPlugin,
         "native-export": NativeExportPlugin,
         "observed-evidence": ObservedEvidencePlugin,
+        "research-batch": ResearchBatchPlugin,
         "spacy": SpacyKeywordPlugin,
         "text-library": TextLibraryPlugin,
         **online_factories(),

@@ -290,3 +290,19 @@ def test_keywordtool_different_suggestion_and_volume_geographies():
 def test_keywordtool_unsupported_platform_combinations_fail_before_request(options):
     with pytest.raises(ConfigurationError):
         call("keywordtool","suggestions",options,lambda _: pytest.fail("must not request"))
+
+
+def test_datamuse_topic_context_and_spanish_vocabulary():
+    def handler(request):
+        assert dict(request.url.params) == {"ml": "libertad", "max": "50", "v": "es",
+                                            "topics": "music,song", "lc": "la", "rc": "canta"}
+        return response_for("datamuse")
+    result = call("datamuse", "related", {"vocabulary": "es", "topics": "music,song",
+                "left_context": "la", "right_context": "canta"}, handler, keywords=("libertad",))
+    assert result.metadata["language"] == "Spanish"
+
+
+@pytest.mark.parametrize("options", [{"topics": "one two three four five six"}, {"left_context": "two words"}, {"vocabulary": "fa"}])
+def test_datamuse_invalid_context_fails_before_request(options):
+    with pytest.raises(ConfigurationError):
+        call("datamuse", "related", options, lambda _: pytest.fail("must not request"))

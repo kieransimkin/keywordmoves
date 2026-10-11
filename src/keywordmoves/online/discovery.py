@@ -3,11 +3,13 @@ from __future__ import annotations
 
 from ..models import PluginDescriptor
 from .common import (
+    ConfigurationError,
     OnlinePlugin,
     OnlineSourceError,
     array,
     boolean,
     candidate,
+    choice,
     code,
     integer,
     number,
@@ -16,6 +18,7 @@ from .common import (
     provider_error,
     secret,
     seeds,
+    text,
 )
 
 
@@ -129,15 +132,32 @@ class DatamusePlugin(OnlinePlugin):
         operation = request.operation
         parameter = {"related": "ml", "synonyms": "rel_syn", "suggestions": "s"}[operation]
         route = "sug" if operation == "suggestions" else "words"
-        data = http.json("GET", f"https://api.datamuse.com/{route}",
-                         params={parameter: seed, "max": integer(request.options, "limit", 50, 1, 1000)})
+        o = request.options
+        params = {parameter: seed, "max": integer(o, "limit", 50, 1, 1000)}
+        vocabulary = choice(o, "vocabulary", "en", ("en", "es"))
+        if vocabulary == "es":
+            params["v"] = "es"
+        if "topics" in o:
+            topics = text(o, "topics")
+            if len(topics.replace(",", " ").split()) > 5:
+                raise ConfigurationError("Datamuse topics accepts at most five words.")
+            params["topics"] = topics
+        for option, key in (("left_context", "lc"), ("right_context", "rc")):
+            if option in o:
+                value = text(o, option)
+                if len(value.split()) != 1:
+                    raise ConfigurationError("Datamuse context hints must be one word each.")
+                params[key] = value
+        data = http.json("GET", f"https://api.datamuse.com/{route}", params=params)
         items = [candidate("Datamuse", obj(row).get("word"),
                            {"lexical_match_score": (number(row.get("score")), "provider_rank_score")},
                            observed_at=observed, relationship=operation,
                            note="Lexical association score with no search-volume interpretation.") for row in array(data)]
-        return items, {"language": "English"}, [
+        return items, {"language": "Spanish" if vocabulary == "es" else "English",
+                       "topics": params.get("topics"), "left_context": params.get("lc"),
+                       "right_context": params.get("rc")}, [
             "Related language is not search demand. Attribute Datamuse when displaying its data publicly.",
-            "Datamuse announces API-key requirements from 1 January 2027; this unauthenticated adapter may need updating then.",
+            "Datamuse's current documentation gives conflicting January/February 2027 API-key dates; recheck access requirements before using this unauthenticated adapter then.",
         ]
 
 

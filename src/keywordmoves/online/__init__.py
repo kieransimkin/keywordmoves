@@ -20,6 +20,7 @@ def factories() -> dict[str, Callable[[], Any]]:
         SerpAPIPlugin,
         WikipediaPlugin,
     )
+    from .expanded_sources import ITunesCatalogPlugin, SERankingPlugin, WikimediaPageviewsPlugin
     from .google import GoogleAdsPlugin, SearchConsolePlugin
     from .google_search import GoogleSearchPlugin
     from .instagram import InstagramPlugin
@@ -36,6 +37,7 @@ def factories() -> dict[str, Callable[[], Any]]:
     from .youtube import YouTubePlugin
 
     classes = (
+        ITunesCatalogPlugin, SERankingPlugin, WikimediaPageviewsPlugin,
         BingSearchPlugin, AhrefsPlugin, AlsoAskedPlugin, AnswerThePublicPlugin, BingAutocompletePlugin,
         BraveSuggestPlugin, DataForSEOPlugin, DatamusePlugin, DuckDuckGoAutocompletePlugin,
         GoogleAdsPlugin, GoogleAutocompletePlugin, KeywordsEverywherePlugin, KeywordToolPlugin,
