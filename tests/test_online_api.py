@@ -285,6 +285,14 @@ def test_keywordtool_different_suggestion_and_volume_geographies():
     assert scopes["estimated_search_volume"] == "google:location:2826"
 
 
+@pytest.mark.parametrize("operation", ["suggestions", "metrics"])
+def test_keywordtool_youtube_supports_worldwide(operation):
+    def handler(req):
+        assert json.loads(req.content)["country"] == "GLB"
+        return response_for("keywordtool")
+    call("keywordtool", operation, {"platform": "youtube", "country": "GLB"}, handler)
+
+
 @pytest.mark.parametrize("options", [{"platform":"instagram","suggestion_type":"questions","country":"GB"},
                                      {"platform":"google-trends","metrics":True,"country":"GB"}])
 def test_keywordtool_unsupported_platform_combinations_fail_before_request(options):

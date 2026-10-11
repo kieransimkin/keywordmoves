@@ -11,7 +11,7 @@ from ..models import PluginDescriptor, PluginRequest, PluginResult
 
 FREE = {"datamuse", "wikipedia", "wikimedia-pageviews", "itunes-catalog"}
 PAID = {"seranking"}
-IMPORTS = {"native-export", "observed-evidence", "google-trends", "ubersuggest", "answerthepublic", "vidiq", "candidate-focus"}
+IMPORTS = {"native-export", "observed-evidence", "google-trends", "ubersuggest", "answerthepublic", "vidiq", "candidate-focus", "keywordtool"}
 SECRET_KEYS = {"api_key", "access_token", "refresh_token", "developer_token", "password", "login", "client_secret", "token", "authorization", "cookie", "cookies"}
 
 
@@ -50,6 +50,8 @@ class ResearchBatchPlugin:
             plugin = task["plugin"]
             if plugin not in FREE | PAID | IMPORTS:
                 raise InputError("Source is not supported by the batch contract; use its dedicated module.")
+            if plugin == "keywordtool" and task["operation"] != "import-json":
+                raise InputError("Research batches permit only offline Keyword Tool import-json; live calls may be metered.")
             options = task.get("options", {})
             if (not isinstance(options, dict)
                 or any(not isinstance(k, str) or k.lower() in SECRET_KEYS or k.lower().endswith(("_key", "_token", "_secret", "_password")) for k in options)

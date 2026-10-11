@@ -140,9 +140,15 @@ class AhrefsPlugin(OnlinePlugin):
 
 class KeywordToolPlugin(OnlinePlugin):
     descriptor = PluginDescriptor("keywordtool", "Keyword Tool v2 multi-platform suggestions and volume metrics.",
-                                  ("discover", "analyse", "official-api"), ("suggestions", "metrics"))
+                                  ("discover", "analyse", "official-api"), ("suggestions", "metrics", "import-json"))
     hosts = ("api.keywordtool.io",)
     interval = 4.0
+
+    def run(self, request, context):
+        if request.operation == "import-json":
+            from ..builtin.keywordtool_import import import_youtube
+            return import_youtube(request)
+        return super().run(request, context)
     platforms = ("google", "bing", "youtube", "perplexity", "amazon", "ebay", "app-store",
                  "play-store", "instagram", "twitter", "reddit", "pinterest", "etsy", "tiktok", "naver",
                  "google-trends")
@@ -173,7 +179,7 @@ class KeywordToolPlugin(OnlinePlugin):
         language = code(o, "language", "en")
         currency = code(o, "currency", "USD", r"[A-Za-z]{3}").upper()
         if request.operation == "suggestions" or platform not in {"google", "bing"}:
-            country = code(o, "country").upper()
+            country = code(o, "country", pattern=r"[A-Za-z]{2}|[Gg][Ll][Bb]" if platform == "youtube" else r"[A-Za-z]{2}").upper()
             body.update(country=country, language=language)
         if request.operation == "suggestions":
             kinds = self.suggestion_types.get(platform, ("suggestions",))

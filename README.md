@@ -1,5 +1,8 @@
 # KeywordMoves
 
+For free YouTube relative-interest exports, completed-period summaries and
+independent provider imports, see [YouTube demand sources](docs/youtube-demand-sources.md).
+
 [![KeywordMoves logo](https://raw.githubusercontent.com/kieransimkin/keywordmoves/v0.3.2/docs/branding/logo.png)](https://kieransimkin.co.uk/danceflow/)
 
 By **[Kieran Simkin](https://kieransimkin.co.uk/)** · [DanceFlow ecosystem](https://kieransimkin.co.uk/danceflow/) · [Vector logo and usage guide](docs/branding/README.md).

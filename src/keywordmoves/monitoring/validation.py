@@ -21,7 +21,7 @@ KINDS = {
 }
 DEMAND_KINDS = {"search_volume_estimate", "relative_interest", "platform_search_interest"}
 SECRET_KEYS = {
-    "api_key", "access_token", "refresh_token", "password", "cookie", "cookies",
+    "api_key", "apikey", "access_token", "refresh_token", "password", "cookie", "cookies",
     "authorization", "client_secret", "developer_token", "llm_api_key",
 }
 IDENTITY_FIELDS = (
