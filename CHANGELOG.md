@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.4 - 2026-10-11
+
+- Add a named YT Keyword Tool module for reviewed public suggestions, categories
+  and within-batch tier labels, retaining unknown geography and measurement dates.
+- Extend Keywords Everywhere with free public HTML imports of Google planning
+  displays, excluding unmeasured suggestions and keeping Google volume, CPC,
+  paid competition and growth separate from YouTube demand.
+- Compose both offline imports through research batches, reject live metered
+  routes, and prevent hidden stale UI from becoming current data.
+- Document follow-up quality/access checks, add regression coverage and an
+  executable synthetic example without bundling private or real source captures.
+
 ## 0.5.3 - 2026-10-11
 
 - Import the free public vidIQ keyword overview from reviewed rendered HTML,

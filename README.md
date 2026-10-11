@@ -37,9 +37,14 @@ Project website: [https://kieransimkin.co.uk/danceflow/](https://kieransimkin.co
 See [multi-source research](docs/multi-source-research.md) for the source/access
 inventory, explicit research plans and source-native evidence limits.
 
+[Free public-source modules](docs/free-public-source-modules.md) covers reviewed
+YT Keyword Tool suggestions and Keywords Everywhere's Google planning context,
+with explicit metric boundaries and a reproducible offline example.
+
 | Plugin | Kind | What it does |
 | --- | --- | --- |
 | `vidiq` | keyword | Offline authorised keyword-result imports and the free public overview, with country scope, rounding, censoring and provider dates intact. See [imports and comparisons](docs/vidiq-benchmark.md) and [free-source checks](docs/free-youtube-volume-sources.md). |
+| `ytkeywordtool` | keyword | Reviewed public suggestions and within-batch tier labels; no invented volume, geography or universal score. |
 | `candidate-focus` | keyword | Explainable literal phrase filtering and matching terms across saved source results; no combined demand score. |
 | `research-batch` | keyword | Validates and runs explicit bounded multi-source plans, preserving subjects, units and unavailable tasks. |
 | `seranking` | keyword | Regional third-party keyword estimates and related/question/long-tail language with a documented credit guard; account access requires separate approval. |

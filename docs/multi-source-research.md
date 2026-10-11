@@ -1,5 +1,10 @@
 # Multi-source research
 
+Reviewed YT Keyword Tool suggestions and free Keywords Everywhere Google planning
+context compose offline through `import-public-html`. The batch contract rejects
+live Keywords Everywhere metrics requests. See [free public-source modules](free-public-source-modules.md)
+for capture instructions, metric scope and sources held after follow-up checks.
+
 The free public vidIQ overview can be composed with `vidiq/import-public-html`.
 It preserves US rounded monthly displays separately from seven-day growth with
 unstated geography. See [free-source checks](free-youtube-volume-sources.md).
