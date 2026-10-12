@@ -13,19 +13,31 @@ URL = "https://ytkeywordtool.com/"
 
 class YTKeywordToolPlugin:
     descriptor = PluginDescriptor(
-        "ytkeywordtool", "Import reviewed YT Keyword Tool suggestions and within-batch tier labels.",
-        ("import", "language-suggestions", "offline"), ("import-public-html",),
+        "ytkeywordtool", "Collect free public-form suggestions or import reviewed within-batch tier labels.",
+        ("import", "language-suggestions", "public-form", "browser-collection"),
+        ("import-public-html", "collect-public", "collect-browser"),
     )
 
+    def __init__(self, *, transport=None):
+        self._transport = transport
+
     def run(self, request, context):
-        del context
+        if request.operation == "collect-public":
+            from ..online.free_public import collect_ytkeywordtool
+            return collect_ytkeywordtool(request, self._transport)
+        if request.operation == "collect-browser":
+            from ..browser_capture import collect_browser
+            return collect_browser(self.descriptor.name, request, context)
+        return self.import_html(request)
+
+    def import_html(self, request, *, captured_bytes=None):
         if request.operation != "import-public-html" or len(request.keywords) != 1:
             raise ConfigurationError("ytkeywordtool import-public-html requires one explicit seed keyword.")
         seed = label(request.keywords[0], "reviewed seed")
-        doc, observed, metadata = visible_document(request, URL, {"source_url", "observed_at"})
+        doc, observed, metadata = visible_document(request, URL, {"source_url", "observed_at"}, captured_bytes=captured_bytes)
         root = one(doc, "#tool-results")
         count = one(root, "#results-count").get_text(" ", strip=True)
-        match = re.fullmatch(r"(\d+) keywords found", count)
+        match = re.fullmatch(r"(\d+) keywords? found", count)
         if not match or not 1 <= int(match[1]) <= 10000:
             raise InputError("Expected a bounded displayed keyword count; empty/error pages are unavailable.")
         total = int(match[1])

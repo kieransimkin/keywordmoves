@@ -233,10 +233,13 @@ class KeywordToolPlugin(OnlinePlugin):
 
 class KeywordsEverywherePlugin(OnlinePlugin):
     descriptor = PluginDescriptor("keywords-everywhere", "Keywords Everywhere batch volume, CPC and competition data.",
-                                  ("analyse", "official-api", "offline-import"), ("metrics", "import-public-html"))
+                                  ("analyse", "official-api", "offline-import", "browser-collection"), ("metrics", "import-public-html", "collect-browser"))
     hosts = ("api.keywordseverywhere.com",)
 
     def run(self, request, context):
+        if request.operation == "collect-browser":
+            from ..browser_capture import collect_browser
+            return collect_browser(self.descriptor.name, request, context)
         if request.operation == "import-public-html":
             from ..builtin.keywords_everywhere_public import import_public_html
             return import_public_html(request)

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.5 - 2026-10-12
+
+- Collect YT Keyword Tool public-form JSON automatically with robots checks,
+  low-rate bounded requests, input-echo validation and source-specific metrics.
+- Add a packaged supported-browser collector for the free Keywords Everywhere
+  and YT forms, with scope/quota checks, partial-harvest stopping, source job-URL
+  handling, cleanup and direct in-memory parser analysis without manual HTML.
+- Add a guarded public vidIQ fetch; rate-limited policy checks stop collection
+  without retries or client/browser fallback. Its live route remains unavailable.
+- Compose automatic free tasks through research batches, retain missing drivers
+  as unavailable, and keep paid APIs excluded. Add public synthetic examples,
+  Python/JavaScript regression coverage and matching release validation.
+
 ## 0.5.4 - 2026-10-11
 
 - Add a named YT Keyword Tool module for reviewed public suggestions, categories

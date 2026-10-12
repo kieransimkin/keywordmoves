@@ -52,8 +52,12 @@ class ResearchBatchPlugin:
                 raise InputError("Source is not supported by the batch contract; use its dedicated module.")
             if plugin == "keywordtool" and task["operation"] != "import-json":
                 raise InputError("Research batches permit only offline Keyword Tool import-json; live calls may be metered.")
-            if plugin in {"ytkeywordtool", "keywords-everywhere"} and task["operation"] != "import-public-html":
-                raise InputError("Research batches permit only reviewed offline public HTML for this source; no live call is authorised.")
+            if plugin in {"ytkeywordtool", "keywords-everywhere"} and task["operation"] not in (
+                {"import-public-html", "collect-public", "collect-browser"} if plugin == "ytkeywordtool"
+                else {"import-public-html", "collect-browser"}):
+                raise InputError("Research batches permit the free public collectors/imports only; live metered APIs remain excluded.")
+            if plugin == "vidiq" and task["operation"] not in {"import-json", "import-public-html", "collect-public"}:
+                raise InputError("Research batches permit authorised vidIQ imports or the free public feed only.")
             options = task.get("options", {})
             if (not isinstance(options, dict)
                 or any(not isinstance(k, str) or k.lower() in SECRET_KEYS or k.lower().endswith(("_key", "_token", "_secret", "_password")) for k in options)
@@ -87,6 +91,8 @@ class ResearchBatchPlugin:
         results, candidates = [], []
         for task in tasks:
             options = dict(task.get("options", {}))
+            if task["operation"] == "collect-public" and task["plugin"] in {"vidiq", "ytkeywordtool"}:
+                options.setdefault("max_requests", 2)
             if task["plugin"] not in IMPORTS:
                 options.setdefault("max_requests", 1)
             try:

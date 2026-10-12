@@ -1,5 +1,11 @@
 # Online keyword discovery and analysis
 
+The [automatic free-source guide](automatic-free-collection.md) covers the
+additional YT public-form JSON collector, guarded public vidIQ page retrieval,
+and supported connected-browser collectors. These retain public-client/browser
+access labels; they are not official developer APIs. Browser collection requires
+an authorised caller-owned driver, and paid metrics remain separate.
+
 Research date: **2 October 2026**. Integration baseline:
 `23e6959bbaabfe4e34d5c073afc0529bc004b5f4`.
 

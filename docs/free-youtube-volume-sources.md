@@ -1,5 +1,11 @@
 # Free YouTube search-volume source audit
 
+Update, 12 October 2026: [automatic collection](automatic-free-collection.md)
+adds bounded YT Keyword Tool public-form JSON retrieval and connected-browser
+collection of Keywords Everywhere Google context. The public vidIQ HTTP
+collector stays unavailable after a fresh robots-policy 429; no bypass is
+provided. The dated audit below preserves the earlier findings.
+
 For later native testing of suggestion/result tools and the additional working
 imports, see [free public-source modules](free-public-source-modules.md). That
 follow-up holds Navid and Keyword Tool Dominator's autocomplete claims after
