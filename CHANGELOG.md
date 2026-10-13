@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.6 - 2026-10-13
+
+- Collect native Google Trends YouTube Search interest and related-query CSVs
+  through an authorised connected browser and analyse them directly in memory.
+  Validate the requested term, geographic scope, date preset, category, search
+  property, unique chart and source CSV headers before accepting evidence.
+- Preserve original export hashes and source units; exclude unfinished periods
+  from interest summaries. Missing or censored values never become exact volume.
+- Add guarded browser-download handoff, failure/changed-scope regressions,
+  synthetic examples and wheel/source-distribution identity verification.
+
 ## 0.5.5 - 2026-10-12
 
 - Collect YT Keyword Tool public-form JSON automatically with robots checks,

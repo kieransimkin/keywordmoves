@@ -53,7 +53,7 @@ with explicit metric boundaries and a reproducible offline example.
 | `google-search` | keyword | Google Search Console, Trends exports, search observations and page audits with source-specific metrics. |
 | `bing-search` | keyword | Bing Webmaster, reviewed search results and keyword planning evidence. |
 | `youtube`, `tiktok`, `instagram`, `reddit` | keyword | Separate platform workbenches for authorised exports, native observations, local reference text and supported providers. Read each module's access and metric limits. |
-| `google-trends` | keyword | Imports Google Trends interest and related-query CSV exports, preserving the distinction between relative index values and absolute search volume. |
+| `google-trends` | keyword | Imports Trends CSVs or automatically downloads native YouTube Search interest and related-query exports through an authorised connected browser; preserves relative indices and growth separately from absolute volume. |
 | `keybert` | keyword | Ranks literal reference-text phrases with local sentence embeddings; supports cosine similarity, MMR and Max Sum selection. No generative LLM required. |
 | `nltk` | keyword | Extracts proper nouns, grammar-based noun chunks, named entities and keyphrases locally with NLTK. No LLM required. |
 | `native-export` | keyword | Imports reviewed platform CSV reports with explicit columns, metric units and missing/censored states. |
@@ -66,8 +66,15 @@ with explicit metric boundaries and a reproducible offline example.
 Google's official Trends API is currently an access-controlled alpha. The
 built-in plugin therefore supports reproducible CSV exports now rather than
 depending on the archived, unofficial `pytrends` scraper or guessing an API
-contract. A live official-API backend can be added when access and its exact
-contract are available.
+contract. Since 0.5.6, `google-trends/collect-browser` and the packaged
+`keywordmoves/browser/google_trends.mjs` helper operate the native CSV download
+and pass the result directly to the existing parser. No manual export/import
+is needed. One plain search term, eight supported countries, three date presets
+and one chosen interest/related-query chart are checked against the visible UI
+and CSV. Interest summaries exclude unfinished periods; source request counts
+remain unknown. An authorised dedicated browser tab/driver is required; the CLI
+does not start a browser. See [automatic collection](docs/automatic-free-collection.md).
+A live official-API backend can be added when access and its exact contract are available.
 
 ## Credentials
 

@@ -13,7 +13,9 @@ This is a defined set of **18 new adapters**, not a claim to support every onlin
 SEO product or every endpoint offered by these providers. Twelve adapters use
 provider-documented APIs; three use explicitly experimental browser suggestion
 endpoints; one handles reviewed public HTML; two import user-exported reports.
-The existing `google-trends` CSV importer remains unchanged.
+The existing `google-trends` CSV imports remain compatible. The 0.5.6 native
+browser-download collector feeds those parsers directly; see
+[automatic collection](automatic-free-collection.md).
 
 **Access status matters.** The request/response contracts were researched and
 covered by offline tests. Paid accounts, live authenticated API requests and the

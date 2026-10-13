@@ -21,6 +21,13 @@ def verify(directory):
         prefix = sdists[0].name[:-7] + "/"
         assert package.extractfile(prefix + relative).read() == helper
         assert package.extractfile(prefix + "tests/browser_free_public.test.mjs").read() == test
+    trends = (root / "src/keywordmoves/browser/google_trends.mjs").read_bytes()
+    with zipfile.ZipFile(wheels[0]) as package:
+        assert package.read("keywordmoves/browser/google_trends.mjs") == trends
+        assert package.read("keywordmoves/trends_browser.py") == (root / "src/keywordmoves/trends_browser.py").read_bytes()
+    with tarfile.open(sdists[0], "r:gz") as package:
+        assert package.extractfile(prefix + "src/keywordmoves/browser/google_trends.mjs").read() == trends
+        assert package.extractfile(prefix + "tests/browser_google_trends.test.mjs").read() == (root / "tests/browser_google_trends.test.mjs").read_bytes()
     result = {"browser_helper_sha256": hashlib.sha256(helper).hexdigest(),
         "distributions": {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in [*wheels, *sdists]}}
     print(json.dumps(result))
