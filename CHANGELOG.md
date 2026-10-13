@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.8 - 2026-10-13
+
+- Add offline candidate-shortlist/select for dated, explicit editorial decisions
+  tied to an exact candidate-pool hash and subject/platform scope. Preserve native
+  evidence and scores, limit repeated intent groups, explain exclusions and
+  report shortages without padding. No demand model or campaign implementation
+  is implied. Compose through research-batch, with synthetic regression coverage,
+  documentation and an executable offline example.
+
 ## 0.5.7 - 2026-10-13
 
 - Add optional required context groups to candidate-focus, allowing listening

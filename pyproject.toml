@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "keywordmoves"
-version = "0.5.7"
+version = "0.5.8"
 description = "Source-specific keyword research, demand monitoring and reviewed evidence imports for DanceFlow. https://kieransimkin.co.uk/"
 readme = "README.md"
 license = "MIT"
@@ -53,6 +53,7 @@ keywordmoves = "keywordmoves.cli:main"
 [project.entry-points."keywordmoves.plugins"]
 vidiq = "keywordmoves.builtin.vidiq:VidiqPlugin"
 candidate-focus = "keywordmoves.builtin.candidate_focus:CandidateFocusPlugin"
+candidate-shortlist = "keywordmoves.builtin.candidate_shortlist:CandidateShortlistPlugin"
 itunes-catalog = "keywordmoves.online.expanded_sources:ITunesCatalogPlugin"
 research-batch = "keywordmoves.builtin.research_batch:ResearchBatchPlugin"
 seranking = "keywordmoves.online.expanded_sources:SERankingPlugin"

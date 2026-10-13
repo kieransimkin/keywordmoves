@@ -47,6 +47,7 @@ class _Registry(Generic[T]):
 
 def _keyword_builtins() -> dict[str, Callable[[], Any]]:
     from .builtin.candidate_focus import CandidateFocusPlugin
+    from .builtin.candidate_shortlist import CandidateShortlistPlugin
     from .builtin.google_trends import GoogleTrendsPlugin
     from .builtin.keybert_keywords import KeyBERTKeywordPlugin
     from .builtin.native_export import NativeExportPlugin
@@ -61,6 +62,7 @@ def _keyword_builtins() -> dict[str, Callable[[], Any]]:
 
     return {
         "candidate-focus": CandidateFocusPlugin,
+        "candidate-shortlist": CandidateShortlistPlugin,
         "vidiq": VidiqPlugin,
         "ytkeywordtool": YTKeywordToolPlugin,
         "google-trends": GoogleTrendsPlugin,

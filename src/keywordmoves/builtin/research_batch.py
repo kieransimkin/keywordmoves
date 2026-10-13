@@ -11,7 +11,7 @@ from ..models import PluginDescriptor, PluginRequest, PluginResult
 
 FREE = {"datamuse", "wikipedia", "wikimedia-pageviews", "itunes-catalog"}
 PAID = {"seranking"}
-IMPORTS = {"native-export", "observed-evidence", "google-trends", "ubersuggest", "answerthepublic", "vidiq", "candidate-focus", "keywordtool", "ytkeywordtool", "keywords-everywhere"}
+IMPORTS = {"native-export", "observed-evidence", "google-trends", "ubersuggest", "answerthepublic", "vidiq", "candidate-focus", "candidate-shortlist", "keywordtool", "ytkeywordtool", "keywords-everywhere"}
 SECRET_KEYS = {"api_key", "access_token", "refresh_token", "developer_token", "password", "login", "client_secret", "token", "authorization", "cookie", "cookies"}
 
 
