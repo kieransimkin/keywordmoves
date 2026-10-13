@@ -69,12 +69,27 @@ depending on the archived, unofficial `pytrends` scraper or guessing an API
 contract. Since 0.5.6, `google-trends/collect-browser` and the packaged
 `keywordmoves/browser/google_trends.mjs` helper operate the native CSV download
 and pass the result directly to the existing parser. No manual export/import
-is needed. One plain search term, eight supported countries, three date presets
+is needed. One plain search term (or up to five matched interest-comparison terms), eight supported countries, three date presets
 and one chosen interest/related-query chart are checked against the visible UI
 and CSV. Interest summaries exclude unfinished periods; source request counts
 remain unknown. An authorised dedicated browser tab/driver is required; the CLI
 does not start a browser. See [automatic collection](docs/automatic-free-collection.md).
 A live official-API backend can be added when access and its exact contract are available.
+
+Since 0.5.7, `google-trends/assess-interest` gives each term its completed-period
+mean index, reporting bounds for `<1` censoring, positive/threshold-zero period
+counts and a rank only within the same comparison export. Separate searches each
+normalise independently: their peaks or means cannot rank demand against one
+another. Missing values stay unavailable; reporting bounds are not statistical
+confidence intervals, and no absolute monthly volume or cross-provider score is
+invented. See [native demand assessment](docs/trends-demand-assessment.md).
+
+Candidate filtering can require multiple independent context groups in 0.5.7:
+`--option "require_groups=song|songs|music;grief|loss|mourning"` keeps literal
+listening context and a relevant topic together. Each semicolon group must match
+at least one pipe-separated alternative. Original metrics stay unchanged and
+every rejected row has a reason; human song-fit review remains necessary.
+See [context filtering](docs/candidate-context.md).
 
 ## Credentials
 

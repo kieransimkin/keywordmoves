@@ -30,28 +30,37 @@ def scope(seed, country, window, chart):
 
 
 def analyse_capture(data):
+    comparison = isinstance(data, dict) and data.get("schema") == "keywordmoves-trends-browser/v2"
     allowed = {"schema", "source", "source_url", "page_url", "observed_at", "seed", "country",
                "window", "chart", "controls", "csv"}
-    if (not isinstance(data, dict) or data.get("schema") != SCHEMA or set(data) != allowed
+    if comparison:
+        allowed = allowed - {"seed"} | {"keywords"}
+    if (not isinstance(data, dict) or data.get("schema") not in (SCHEMA, "keywordmoves-trends-browser/v2") or set(data) != allowed
             or data.get("source") != "google-trends" or data.get("source_url") != SOURCE):
         raise InputError("Expected a native keywordmoves-trends-browser/v1 receipt.")
-    seed, country, window, chart = (data[k] for k in ("seed", "country", "window", "chart"))
+    country, window, chart = (data[k] for k in ("country", "window", "chart"))
+    words = data.get("keywords") if comparison else [data["seed"]]
+    if (not isinstance(words, list) or not 1 <= len(words) <= 5 or comparison and (len(words) < 2 or chart != "interest")
+            or not all(isinstance(w, str) for w in words) or len({w.casefold() for w in words}) != len(words)):
+        raise InputError("Trends comparison requires 2-5 unique search terms and the interest chart.")
+    seed = words[0]
     try:
-        scope(seed, country, window, chart)
+        for word in words:
+            scope(word, country, window, chart)
     except (ConfigurationError, TypeError) as exc:
         raise InputError("Invalid Trends receipt scope.") from exc
     if not isinstance(data["page_url"], str):
         raise InputError("Trends page URL must be text.")
     page = urlsplit(data["page_url"])
     query = parse_qs(page.query, keep_blank_values=True)
-    expected = {"q": [seed], "gprop": ["youtube"], "hl": ["en"]}
+    expected = {"q": [",".join(words)], "gprop": ["youtube"], "hl": ["en"]}
     if (page.scheme != "https" or page.netloc != "trends.google.com" or page.path != "/trends/explore"
             or page.fragment or set(query) - {"q", "gprop", "hl", "geo", "date", "cat"}
             or any(query.get(k) != v for k, v in expected.items())
             or query.get("geo", [""]) != ([""] if country == "GLB" else [country])
             or query.get("date", ["today 12-m"]) != [window] or query.get("cat", ["0"]) != ["0"]):
         raise InputError("Trends URL does not match the requested YouTube Search scope.")
-    controls = {"seed": seed, "country": COUNTRIES[country], "window": WINDOWS[window],
+    controls = {**({"keywords": words} if comparison else {"seed": seed}), "country": COUNTRIES[country], "window": WINDOWS[window],
                 "property": "YouTube Search", "category": "All categories", "term_type": "Search term"}
     if data["controls"] != controls:
         raise InputError("Trends visible controls disagree with the request.")
@@ -64,9 +73,9 @@ def analyse_capture(data):
         raise InputError("Native Trends export category changed.")
     rows = [r for r in rows if r and any(r)]
     if chart == "interest":
-        if (len(rows) < 3 or len(rows[1]) not in {2, 3} or rows[1][0] not in {"Week", "Day", "Month"}
-                or rows[1][1] != f"{seed}: ({COUNTRIES[country]})"
-                or (len(rows[1]) == 3 and rows[1][2] != "IsPartial")):
+        columns = [f"{w}: ({COUNTRIES[country]})" for w in words]
+        if (len(rows) < 3 or rows[1][0] not in {"Week", "Day", "Month"}
+                or rows[1][1:] not in [columns, columns + ["IsPartial"]]):
             raise InputError("Native Trends CSV term, country or chart changed.")
         # Duplicate dates must not inflate completed-period means.
         periods = [r[0] for r in rows[2:] if r]
@@ -88,13 +97,13 @@ def analyse_capture(data):
         if abs(span - target) > 2 or abs((end - datetime.fromisoformat(observed).date()).days) > 1:
             raise InputError("Native related-query reporting window disagrees with the capture.")
     options = {"observed_at": observed, "geography": country, "window": window,
-               "scope": "native YouTube Search export; one search term; all categories",
+               "scope": "native YouTube Search export; " + ("matched comparison" if comparison else "one search term") + "; all categories",
                "category": "0", "search_property": "youtube", "seed_keyword": seed,
                "normalization_id": sha, "completed_periods_only": chart == "interest"}
     parsed = GoogleTrendsPlugin().import_csv(
         PluginRequest("import-interest" if chart == "interest" else "import-related", options=options),
         captured_bytes=raw)
-    if chart == "interest" and any(_clean_series_name(k.phrase).casefold() != seed.casefold() for k in parsed.keywords):
+    if chart == "interest" and [_clean_series_name(k.phrase).casefold() for k in parsed.keywords] != [w.casefold() for w in words]:
         raise InputError("Unexpected Trends export series.")
     return replace(parsed, operation="collect-browser", keywords=tuple(replace(k, score=None)
                    for k in parsed.keywords), notes=(
@@ -103,23 +112,27 @@ def analyse_capture(data):
                        *parsed.notes), metadata={**parsed.metadata, "access": "native-browser-csv",
                        "source_url": SOURCE, "page_url": data["page_url"], "requested_seed": seed,
                        "chart": chart, "controls": controls, "manual_import_required": False,
+                       "comparison_keywords": words, "within_export_comparable": comparison,
                        "network_requests": None, "capture_origin": "caller-supplied; scope validation is not browser attestation"})
 
 
 def collect_browser(request, context):
     if request.inputs or set(request.options) - {"country", "window", "chart", "maxWaitSeconds"}:
         raise ConfigurationError("collect-browser needs a seed and browser driver, not input files.")
-    seed = seeds(request)[0]
-    if len(request.keywords) != 1:
-        raise ConfigurationError("Trends browser collection requires exactly one explicit search term.")
+    words = seeds(request, maximum=5)
+    seed = words[0]
     country, window, chart = (request.options.get(k, v) for k, v in
                               (("country", "GLB"), ("window", "today 12-m"), ("chart", "interest")))
-    scope(seed, country, window, chart)
+    for word in words:
+        scope(word, country, window, chart)
+    if len(words) > 1 and chart != "interest":
+        raise ConfigurationError("Multiple search terms require the interest chart.")
     integer(request.options, "maxWaitSeconds", 45, 5, 120)
     if context.public_browser is None:
         raise ConfigurationError("Trends collection needs an authorised public_browser driver using browser/google_trends.mjs.")
     data = context.public_browser.collect("google-trends", request)
     if not isinstance(data, dict) or any(data.get(k) != v for k, v in
-                                        (("seed", seed), ("country", country), ("window", window), ("chart", chart))):
+                                        ((("seed", seed),) if len(words) == 1 else (("keywords", words),))
+                                        + (("country", country), ("window", window), ("chart", chart))):
         raise InputError("Trends driver returned a different requested scope.")
     return analyse_capture(data)

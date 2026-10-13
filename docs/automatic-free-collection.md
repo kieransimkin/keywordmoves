@@ -127,7 +127,8 @@ download may remain in the host's normal Downloads directory; this helper does
 not delete files or change browser download settings. Receipts can be archived
 automatically in a caller's evidence store without manual CSV/HTML imports.
 
-One explicit seed (plain search term, no topic IDs or comparison commas), up to
+One explicit seed (plain search term, no topic IDs or comparison commas), or
+`seeds` with 2-5 distinct terms for a matched interest comparison in 0.5.7; up to
 200 characters; `chart=interest` (default) or `related`; `country=GLB` (default),
 GB, US, CA, AU, IN, NZ or ZA; `window="today 12-m"` (default), `"today 3-m"` or
 `"today 5-y"`; `maxWaitSeconds=45` (5..120). English UI, all categories and YouTube
@@ -149,6 +150,8 @@ request) -> receipt` for `google-trends/collect-browser`. `research-batch` also
 accepts this free route. Without the driver it reports unavailable access.
 
 Google documents the [native export control](https://support.google.com/trends/answer/4365538).
+See [demand assessment](trends-demand-assessment.md) for multi-term receipt scope,
+completed-period indices, censoring bounds and comparison limits.
 The [official API](https://developers.google.com/search/apis/trends) still requires
 alpha access; this helper uses the existing website's normal export instead.
 
