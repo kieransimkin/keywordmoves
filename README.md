@@ -46,6 +46,7 @@ with explicit metric boundaries and a reproducible offline example.
 | `vidiq` | keyword | Offline authorised keyword-result imports and the free public overview, with country scope, rounding, censoring and provider dates intact. See [imports and comparisons](docs/vidiq-benchmark.md) and [free-source checks](docs/free-youtube-volume-sources.md). |
 | `ytkeywordtool` | keyword | Reviewed public suggestions and within-batch tier labels; no invented volume, geography or universal score. |
 | `candidate-focus` | keyword | Explainable literal phrase filtering and matching terms across saved source results; no combined demand score. |
+| `candidate-shortlist` | keyword | Applies an explicit dated editorial review to an exact hashed candidate pool, limits repeated intent groups and reports shortages without padding or changing native metrics. |
 | `research-batch` | keyword | Validates and runs explicit bounded multi-source plans, preserving subjects, units and unavailable tasks. |
 | `seranking` | keyword | Regional third-party keyword estimates and related/question/long-tail language with a documented credit guard; account access requires separate approval. |
 | `wikimedia-pageviews` | keyword | Article-reading attention over declared completed daily windows; no keyword-demand interpretation. |
@@ -90,6 +91,16 @@ listening context and a relevant topic together. Each semicolon group must match
 at least one pipe-separated alternative. Original metrics stay unchanged and
 every rejected row has a reason; human song-fit review remains necessary.
 See [context filtering](docs/candidate-context.md).
+
+Since 0.5.8, `candidate-shortlist/select` turns a reviewed pool into a reproducible
+shortlist. The caller supplies song fit, listening/navigation intent, wording,
+intent groups and editorial priorities. Exact input hashes and subject/platform
+scope prevent stale or misapplied reviews. Defaults select five direct, natural
+listening targets, at most two from one declared group. Unreviewed or ineligible
+phrases remain excluded; a shortage stays explicit. Priorities are editorial
+choices, not demand scores or proof of the globally best keywords. Native source
+metrics and campaign lifecycle stay unchanged. See [shortlist review](docs/candidate-shortlist.md)
+and the [offline example](examples/candidate_shortlist.py).
 
 ## Credentials
 

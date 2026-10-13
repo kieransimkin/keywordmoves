@@ -72,7 +72,7 @@ pretend to enforce tariffs it cannot calculate. Browser-only sources require
 dated reviewed captures/exports, not automation through this runner.
 
 Every result retains task identity, subject, original source result and units.
-Offline `vidiq` and `candidate-focus` tasks also compose here; read their
+Offline `vidiq`, `candidate-focus` and `candidate-shortlist/select` tasks also compose here; read their
 [import and phrase-review contract](vidiq-benchmark.md).
 Known source failures become unavailable tasks with their error class, without
 retaining arbitrary upstream error bodies. Empty results remain no-candidates;
