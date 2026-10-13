@@ -24,13 +24,13 @@ from ..monitoring.validation import stamp
 from ..online.common import boolean
 
 
-def _rows(path: Path) -> tuple[list[list[str]], str]:
-    if not path.is_file():
+def _rows(path: Path | None, captured_bytes: bytes | None = None) -> tuple[list[list[str]], str]:
+    if captured_bytes is None and (path is None or not path.is_file()):
         raise InputError(f"Google Trends export does not exist: {path}.")
     try:
-        if path.stat().st_size > 5_000_000:
+        if captured_bytes is None and path.stat().st_size > 5_000_000:
             raise InputError("Google Trends CSV exceeds the 5 MB import bound.")
-        raw = path.read_bytes()
+        raw = captured_bytes if captured_bytes is not None else path.read_bytes()
         if len(raw) > 5_000_000:
             raise InputError("Google Trends CSV exceeds the 5 MB import bound.")
         reader = csv.reader(io.StringIO(raw.decode("utf-8-sig"), newline=""), strict=True)
@@ -87,19 +87,26 @@ class GoogleTrendsPlugin:
         name="google-trends",
         summary="Normalise Google Trends CSV exports into keyword evidence.",
         capabilities=("discover", "analyse", "relative-popularity"),
-        operations=("import-interest", "import-related"),
+        operations=("import-interest", "import-related", "collect-browser"),
     )
 
     def run(self, request: PluginRequest, context: ExecutionContext) -> PluginResult:
-        del context
-        if request.operation not in self.descriptor.operations:
+        if request.operation == "collect-browser":
+            from ..trends_browser import collect_browser
+            return collect_browser(request, context)
+        return self.import_csv(request)
+
+    def import_csv(self, request: PluginRequest, *, captured_bytes: bytes | None = None) -> PluginResult:
+        if request.operation not in {"import-interest", "import-related"}:
             raise ConfigurationError(
                 f"google-trends operation must be one of: {', '.join(self.descriptor.operations)}."
             )
-        if len(request.inputs) != 1:
+        if captured_bytes is None and len(request.inputs) != 1:
             raise ConfigurationError("Google Trends import expects exactly one CSV input.")
-        path = Path(request.inputs[0])
-        rows, raw_sha = _rows(path)
+        if captured_bytes is not None and request.inputs:
+            raise ConfigurationError("Captured Trends CSV does not accept input paths.")
+        path = Path(request.inputs[0]) if captured_bytes is None else None
+        rows, raw_sha = _rows(path, captured_bytes)
         options = {**request.options, "source_sha256": raw_sha}
         geography = request.options.get("geography")
         observed_at = request.options.get("observed_at")
@@ -108,7 +115,7 @@ class GoogleTrendsPlugin:
         return self._related(rows, path, geography, observed_at, options)
 
     def _interest(
-        self, rows: list[list[str]], path: Path, geography: str | None,
+        self, rows: list[list[str]], path: Path | None, geography: str | None,
         observed_at: str | None, options: dict,
     ) -> PluginResult:
         index = _header_index(rows, {"week", "day", "month", "date", "time", "region", "subregion"})
@@ -194,7 +201,7 @@ class GoogleTrendsPlugin:
             self.descriptor.name, "import-interest", tuple(candidates),
             ("Google Trends values are relative indices, not search-volume counts.",
              "Censored, missing or partial series do not receive exact summary values."),
-            {"source_file": str(path.resolve()), "source_sha256": options["source_sha256"],
+            {"source_file": str(path.resolve()) if path else None, "source_sha256": options["source_sha256"],
              "observed_at": observed_at, "geography": geography,
              "completed_periods_only": completed_only,
              **{key: options[key] for key in ("window", "scope", "category", "search_property",
@@ -202,7 +209,7 @@ class GoogleTrendsPlugin:
         )
 
     def _related(
-        self, rows: list[list[str]], path: Path, geography: str | None,
+        self, rows: list[list[str]], path: Path | None, geography: str | None,
         observed_at: str | None, options: dict,
     ) -> PluginResult:
         section = options.get("section")
@@ -286,7 +293,7 @@ class GoogleTrendsPlugin:
             plugin=self.descriptor.name, operation="import-related", keywords=tuple(candidates),
             notes=("Top, Rising and Breakout retain separate units; no cross-platform demand score.",
                    "Different Trends exports may use different normalisation and cannot be compared blindly."),
-            metadata={"source_file": str(path.resolve()), "source_sha256": sha,
+            metadata={"source_file": str(path.resolve()) if path else None, "source_sha256": sha,
                       "export_headers": headers, "duplicate_rows": duplicate_rows,
                       "geography": geography, "observed_at": observed_at,
                       **{key: options[key] for key in (

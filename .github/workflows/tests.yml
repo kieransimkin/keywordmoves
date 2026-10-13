@@ -16,7 +16,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
-      - run: node --test tests/browser_free_public.test.mjs
+      - run: node --test tests/browser_free_public.test.mjs tests/browser_google_trends.test.mjs
   test:
     strategy:
       matrix:

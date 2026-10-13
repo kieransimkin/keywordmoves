@@ -15,7 +15,7 @@ existing parsers. Manual HTML capture/import is optional for these routes.
 | `vidiq/import-public-html` | Public featured monthly displays and rising keywords | US rounded estimates and separate seven-day growth; the rising geography is unspecified. Same vidIQ model, no arbitrary seed queries. |
 | `ytkeywordtool/import-public-html` | Visible suggestions, category, High/Medium/Low labels and presentation order | Provider-reported autocomplete. Tiers are relative to the captured batch, not counts, country demand or cross-batch scores. |
 | `keywords-everywhere/import-public-html` | Displayed Google monthly estimates, CPC, paid-ad competition and growth | Google planning context for phrases from the public tool. No YouTube volume. Rows with all planning values unavailable are excluded. Suggestion origin is an unverified provider claim. |
-| `google-trends/import-interest` and `summarise-interest` | YouTube Search interest CSV and completed-window summaries | Existing relative-interest route. Zero can mean below the reporting threshold; never absolute searches. |
+| `google-trends/import-interest`, `import-related` and `collect-browser` | Native YouTube Search CSV, completed-window summaries and related-query Top/Rising/Breakout | Native browser-download collection is automatic in 0.5.6. Relative interest/growth only; zero can mean below the reporting threshold. |
 
 On 11 October 2026, YT Keyword Tool returned 113 phrases for a music seed and
 reported no suggestions for a newly invented control string. This supports using

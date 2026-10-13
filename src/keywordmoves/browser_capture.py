@@ -22,6 +22,9 @@ SOURCES = {
 
 
 def analyse_capture(data):
+    if isinstance(data, dict) and data.get("schema") == "keywordmoves-trends-browser/v1":
+        from .trends_browser import analyse_capture as analyse_trends
+        return analyse_trends(data)
     if not isinstance(data, dict) or data.get("schema") != SCHEMA:
         raise InputError("Expected keywordmoves-public-browser/v1.")
     if set(data) - {"schema", "source", "source_url", "page_url", "observed_at", "seed", "effective_seed", "country", "currency", "html", "collection"}:
@@ -111,9 +114,9 @@ def collect_browser(source, request, context):
 
 def main():
     try:
-        raw = sys.stdin.buffer.read(6_000_001)
-        if len(raw) > 6_000_000:
-            raise InputError("Browser envelope exceeds 6 MB.")
+        raw = sys.stdin.buffer.read(12_000_001)
+        if len(raw) > 12_000_000:
+            raise InputError("Browser envelope exceeds 12 MB.")
         from .online.youtube_imports import decode_json
         result = analyse_capture(decode_json(raw.decode("utf-8-sig")))
         print(json.dumps(result.to_dict(), ensure_ascii=False))
