@@ -59,3 +59,26 @@ test("local analysis failure preserves the receipt without source retry",async()
   });
   assert.equal(actions.filter(x=>x==="download").length,1);
 });
+
+test("matched comparison preserves all five visible search terms",async()=>{
+  const seeds=["example song","friendship songs","grief songs","night music","protest songs"];
+  const {tab,runtime,actions}=fake({seeds,termCount:5,seed:null});
+  const capture=await collectTrends(tab,{seeds},runtime);
+  assert.equal(capture.schema,"keywordmoves-trends-browser/v2");
+  assert.deepEqual(capture.keywords,seeds);
+  assert.deepEqual(capture.controls.keywords,seeds);
+  assert.ok(!Object.hasOwn(capture,"seed"));
+  assert.equal(actions.filter(a=>a==="download").length,1);
+});
+test("changed comparison terms and visible provider errors stop before download",async()=>{
+  for(const changes of [{seeds:["wrong","second"],termCount:2},{sourceError:true}]){
+    const {tab,runtime,actions}=fake(changes);
+    await assert.rejects(collectTrends(tab,{seeds:["example song","second"]},runtime),/scope-changed|source-data-unavailable/);
+    assert.ok(!actions.includes("download"));
+  }
+});
+test("ambiguous, duplicate or oversized comparison requests never navigate",async()=>{
+  for(const request of [{seed:"a",seeds:["a","b"]},{seeds:["a","A"]},{seeds:["a","b"],chart:"related"},{seeds:["a","b","c","d","e","f"]}]){
+    const {tab,runtime,actions}=fake();await assert.rejects(collectTrends(tab,request,runtime),/invalid-request/);assert.deepEqual(actions,[]);
+  }
+});

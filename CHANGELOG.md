@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.7 - 2026-10-13
+
+- Add optional required context groups to candidate-focus, allowing listening
+  intent and topical context together without mistaking generic word overlap or
+  informational searches for useful music targets. Preserve original evidence.
+
+- Automatically collect matched Google Trends YouTube Search interest comparisons
+  for 2-5 plain terms, validating every visible term and original CSV column.
+  Keep single-term receipt and collection compatibility.
+- Add `google-trends/assess-interest` for completed-period mean indices, native
+  censoring bounds, persistence/threshold counts and ranks confined to the same
+  comparison. No monthly-volume conversion, fabricated zero or universal score.
+- Stop promptly on visible provider display failures, with no retry or fallback.
+  Extend scope, duplicate, censoring, failed-provider and compatibility regressions.
+
 ## 0.5.6 - 2026-10-13
 
 - Collect native Google Trends YouTube Search interest and related-query CSVs

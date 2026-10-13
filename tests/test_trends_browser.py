@@ -179,3 +179,113 @@ def test_related_reporting_window_must_match(dates):
     data["csv"] = data["csv"].replace("13/10/2025 - 13/10/2026", dates)
     with pytest.raises(InputError):
         analyse_capture(data)
+
+
+def comparison_receipt():
+    data = receipt()
+    data["schema"] = "keywordmoves-trends-browser/v2"
+    data["keywords"] = [data.pop("seed"), "friendship songs"]
+    data["page_url"] = data["page_url"].replace(
+        "example%20song", "example%20song,friendship%20songs"
+    )
+    data["controls"]["keywords"] = data["keywords"]
+    del data["controls"]["seed"]
+    data["csv"] = (
+        "Category: All categories\n\nWeek,example song: (Worldwide),friendship songs: (Worldwide)\n2026-10-04,25,50\n2026-10-11,100,60\n"
+    )
+    return data
+
+
+def test_comparison_receipt_retains_shared_normalisation_and_complete_periods():
+    result = analyse_capture(comparison_receipt())
+    assert [k.evidence[0].value for k in result.keywords] == [25, 50]
+    assert result.metadata["within_export_comparable"] is True
+    assert len({k.metadata["normalization_id"] for k in result.keywords}) == 1
+    assert all(k.score is None for k in result.keywords)
+
+
+@pytest.mark.parametrize(
+    "change",
+    ["duplicate", "extra_column", "wrong_term", "wrong_controls", "reordered_columns", "related"],
+)
+def test_comparison_scope_changes_rejected(change):
+    data = comparison_receipt()
+    if change == "duplicate":
+        data["keywords"] = ["example song", "Example Song"]
+    if change == "extra_column":
+        data["csv"] = data["csv"].replace(
+            "friendship songs: (Worldwide)", "friendship songs: (Worldwide),other"
+        )
+    if change == "wrong_term":
+        data["csv"] = data["csv"].replace("friendship songs", "wrong song")
+    if change == "wrong_controls":
+        data["controls"]["keywords"] = ["wrong", "wrong2"]
+    if change == "reordered_columns":
+        data["csv"] = data["csv"].replace(
+            "example song: (Worldwide),friendship songs: (Worldwide)",
+            "friendship songs: (Worldwide),example song: (Worldwide)",
+        )
+    if change == "related":
+        data["chart"] = "related"
+    with pytest.raises(InputError):
+        analyse_capture(data)
+
+
+def test_native_demand_assessment_ranks_only_inside_a_matching_export(tmp_path):
+    path = tmp_path / "comparison.csv"
+    path.write_text(comparison_receipt()["csv"], encoding="utf-8")
+    result = GoogleTrendsPlugin().run(
+        PluginRequest(
+            "assess-interest",
+            inputs=(path,),
+            options={"search_property": "youtube", "observed_at": "2026-10-13", "geography": "GLB"},
+        ),
+        ExecutionContext(None),
+    )
+    assert [k.metadata["demand_profile"]["cohort_rank"] for k in result.keywords] == [2, 1]
+    assert [k.metadata["demand_profile"]["mean_index"] for k in result.keywords] == [25, 50]
+    assert all(
+        k.metadata["demand_profile"]["absolute_monthly_searches"] is None for k in result.keywords
+    )
+
+
+def test_standalone_zero_index_and_censored_series_never_become_exact_monthly_demand(tmp_path):
+    path = tmp_path / "single.csv"
+    path.write_text("Week,example song: (Worldwide)\n2026-10-04,0\n", encoding="utf-8")
+    request = PluginRequest(
+        "assess-interest",
+        inputs=(path,),
+        options={"search_property": "youtube", "observed_at": "2026-10-13"},
+    )
+    profile = (
+        GoogleTrendsPlugin()
+        .run(request, ExecutionContext(None))
+        .keywords[0]
+        .metadata["demand_profile"]
+    )
+    assert profile["cohort_rank"] is None and profile["mean_index"] == 0
+    assert profile["threshold_zero_periods"] == 1 and profile["absolute_monthly_searches"] is None
+    assert profile["mean_index_bounds"]["lower"] == profile["mean_index_bounds"]["upper"] == 0
+    path.write_text("Week,example song: (Worldwide)\n2026-10-04,<1\n", encoding="utf-8")
+    assert (
+        GoogleTrendsPlugin()
+        .run(request, ExecutionContext(None))
+        .keywords[0]
+        .metadata["demand_profile"]["mean_index"]
+        is None
+    )
+    bounds = (
+        GoogleTrendsPlugin()
+        .run(request, ExecutionContext(None))
+        .keywords[0]
+        .metadata["demand_profile"]["mean_index_bounds"]
+    )
+    assert bounds["lower"] == 0 and bounds["upper"] == 1 and bounds["upper_exclusive"]
+    path.write_text("Week,example song: (Worldwide)\n2026-10-04,-\n", encoding="utf-8")
+    assert (
+        GoogleTrendsPlugin()
+        .run(request, ExecutionContext(None))
+        .keywords[0]
+        .metadata["demand_profile"]["mean_index_bounds"]
+        is None
+    )

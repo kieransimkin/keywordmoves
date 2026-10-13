@@ -22,7 +22,7 @@ SOURCES = {
 
 
 def analyse_capture(data):
-    if isinstance(data, dict) and data.get("schema") == "keywordmoves-trends-browser/v1":
+    if isinstance(data, dict) and data.get("schema") in ("keywordmoves-trends-browser/v1", "keywordmoves-trends-browser/v2"):
         from .trends_browser import analyse_capture as analyse_trends
         return analyse_trends(data)
     if not isinstance(data, dict) or data.get("schema") != SCHEMA:

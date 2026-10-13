@@ -39,7 +39,7 @@ class CandidateFocusPlugin:
         if request.operation not in self.descriptor.operations or len(request.keywords) != 1 or not 1 <= len(request.inputs) <= 20:
             raise ConfigurationError("candidate-focus requires one seed and 1-20 saved KeywordMoves JSON results.")
         options = dict(request.options)
-        if set(options) - {"include_any", "exclude_any", "min_overlap", "limit", "subject"}:
+        if set(options) - {"include_any", "exclude_any", "require_groups", "min_overlap", "limit", "subject"}:
             raise ConfigurationError("Unknown candidate-focus option.")
         seed = label(request.keywords[0], "seed")
         seed_terms = set(terms(seed)) - STOPWORDS
@@ -59,6 +59,18 @@ class CandidateFocusPlugin:
             lists[key] = [label(p, key) for p in value.split("|") if p.strip()]
             if len(lists[key]) > 50:
                 raise ConfigurationError("At most 50 explicit phrases per filter.")
+        group_text = options.get("require_groups", "")
+        if not isinstance(group_text, str) or len(group_text) > 20000:
+            raise ConfigurationError("require_groups must be bounded text: semicolon groups of pipe-separated alternatives.")
+        groups = []
+        if group_text:
+            for group in group_text.split(";"):
+                parts = group.split("|")
+                if not all(p.strip() for p in parts) or len(parts) > 20:
+                    raise ConfigurationError("Each required context group needs 1-20 non-empty alternatives.")
+                groups.append([label(p, "required context") for p in parts])
+            if len(groups) > 10:
+                raise ConfigurationError("At most 10 required context groups are supported.")
         kept, rejected, inputs = [], [], []
         row_count = 0
         for path in request.inputs:
@@ -85,6 +97,8 @@ class CandidateFocusPlugin:
                     reason = "excluded_phrase"
                 elif lists["include_any"] and not any(contains(words, p) for p in lists["include_any"]):
                     reason = "required_context_absent"
+                elif any(not any(contains(words, p) for p in group) for group in groups):
+                    reason = "required_context_group_absent"
                 elif request.operation == "matching-terms" and not seed_terms <= set(words):
                     reason = "missing_seed_terms"
                 elif len(overlap) < minimum:

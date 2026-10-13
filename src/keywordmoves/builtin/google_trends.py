@@ -7,6 +7,7 @@ import io
 import math
 import re
 from collections import defaultdict
+from dataclasses import replace
 from datetime import date, timedelta
 from pathlib import Path
 from statistics import mean
@@ -87,13 +88,55 @@ class GoogleTrendsPlugin:
         name="google-trends",
         summary="Normalise Google Trends CSV exports into keyword evidence.",
         capabilities=("discover", "analyse", "relative-popularity"),
-        operations=("import-interest", "import-related", "collect-browser"),
+        operations=("import-interest", "import-related", "collect-browser", "assess-interest"),
     )
 
     def run(self, request: PluginRequest, context: ExecutionContext) -> PluginResult:
         if request.operation == "collect-browser":
             from ..trends_browser import collect_browser
             return collect_browser(request, context)
+        if request.operation == "assess-interest":
+            options = {**request.options, "completed_periods_only": True}
+            if options.get("search_property") not in {"youtube", "web"}:
+                raise ConfigurationError("assess-interest requires search_property=youtube or web.")
+            rows, _ = _rows(Path(request.inputs[0])) if len(request.inputs) == 1 else ([], None)
+            if not rows:
+                raise ConfigurationError("assess-interest requires one native CSV and observed_at.")
+            index = _header_index(rows, {"week", "day", "month", "date"})
+            names = [_clean_series_name(n).casefold() for n in rows[index][1:] if n.casefold() != "ispartial"]
+            periods = [r[0] for r in rows[index + 1:] if r and any(r)]
+            if len(names) != len(set(names)) or len(periods) != len(set(periods)) or periods != sorted(periods):
+                raise InputError("Demand assessment requires unique terms and chronological non-duplicate periods.")
+            parsed = self.import_csv(replace(request, operation="import-interest", options=options))
+            comparable = len(parsed.keywords) > 1 and len({str(k.metadata.get("summary_window")) for k in parsed.keywords}) == 1
+            means = sorted({k.evidence[0].value for k in parsed.keywords if k.evidence[0].value is not None}, reverse=True)
+            keywords = []
+            for k in parsed.keywords:
+                value = k.evidence[0].value
+                points = [p for p in k.metadata["series"] if p.get("eligible_for_summary")]
+                missing = any(p["value"] is None and not p["censored"] for p in points)
+                censored_count = sum(p["censored"] for p in points)
+                bounds = None
+                if points and not missing:
+                    total = sum(p["value"] or 0 for p in points)
+                    bounds = {"lower": math.floor(total / len(points) * 10000) / 10000,
+                              "upper": math.ceil((total + censored_count) / len(points) * 10000) / 10000,
+                              "upper_exclusive": bool(censored_count),
+                              "basis": "bounds on displayed indices with <1 censoring; not a confidence interval or volume estimate"}
+                profile = {"mean_index": value, "unit": "index_0_100", "normalization_id": parsed.metadata["source_sha256"],
+                           "mean_index_bounds": bounds,
+                           "within_export_comparable": comparable, "comparison_terms": names,
+                           "cohort_rank": means.index(value) + 1 if comparable and value is not None else None,
+                           "positive_periods": sum(p["value"] is not None and p["value"] > 0 for p in points),
+                           "threshold_zero_periods": sum(p["value"] == 0 for p in points),
+                           "unknown_or_censored_periods": sum(p["value"] is None for p in points),
+                           "absolute_monthly_searches": None,
+                           "confidence": "relative sampled display only; low-volume values may include statistical noise",
+                           "ranking_limit": "Compare ranks/indices only inside this exact export, property, geography and completed window. Never compare independently normalised exports or interpret zero as no searches."}
+                keywords.append(replace(k, score=None, metadata={**k.metadata, "demand_profile": profile}))
+            return replace(parsed, operation="assess-interest", keywords=tuple(keywords),
+                           metadata={**parsed.metadata, "within_export_comparable": comparable}, notes=(
+                               "Demand assessment preserves native relative indices; no absolute-volume model or universal score.", *parsed.notes))
         return self.import_csv(request)
 
     def import_csv(self, request: PluginRequest, *, captured_bytes: bytes | None = None) -> PluginResult:
