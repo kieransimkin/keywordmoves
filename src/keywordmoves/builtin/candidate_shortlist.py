@@ -7,7 +7,15 @@ from dataclasses import replace
 
 from ..errors import ConfigurationError, InputError
 from ..models import KeywordCandidate, KeywordEvidence, PluginDescriptor, PluginResult
-from ..monitoring.validation import canonical, finite, label, normal, read_json, reject_secrets, stamp
+from ..monitoring.validation import (
+    canonical,
+    finite,
+    label,
+    normal,
+    read_json,
+    reject_secrets,
+    stamp,
+)
 
 
 class CandidateShortlistPlugin:

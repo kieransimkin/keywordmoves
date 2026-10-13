@@ -5,7 +5,13 @@ import pytest
 
 from keywordmoves.builtin.candidate_shortlist import CandidateShortlistPlugin
 from keywordmoves.errors import ConfigurationError, InputError
-from keywordmoves.models import ExecutionContext, KeywordCandidate, KeywordEvidence, PluginRequest, PluginResult
+from keywordmoves.models import (
+    ExecutionContext,
+    KeywordCandidate,
+    KeywordEvidence,
+    PluginRequest,
+    PluginResult,
+)
 from keywordmoves.registry import PluginRegistry
 
 
