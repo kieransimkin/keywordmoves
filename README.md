@@ -23,93 +23,15 @@ It keeps two plugin systems deliberately separate:
 A keyword plugin that needs generative LLM inference must ask for an LLM plugin
 by name. It must not import or silently select a model provider of its own.
 
+## Before every new workflow
 
-## Agents and contributors
+Check the latest stable official release and the actual installed/imported version before starting; do not infer currency from a directory name or a development checkout. Read the current release notes, tagged capability documentation and relevant Potential problems. Use the [DanceFlow release preflight](https://github.com/kieransimkin/DanceFlow/blob/main/docs/workflows/release-preflight.md) and [complete capability references](https://github.com/kieransimkin/DanceFlow/blob/main/docs/capabilities/index.md).
 
-Agents using KeywordMoves should inspect its available capabilities, use them fully where they fit the task, and look for useful improvements wherever possible. When a required feature is missing, or a reusable reliability, usability, performance or documentation gap is found, improve this tool rather than maintaining a separate workaround. If no worthwhile change is justified, explain why.
+People and agents should consider the full ecosystem, use all capabilities that materially serve the task, compose supported files/APIs, and improve a demonstrated reusable gap in its canonical tool. Record why no worthwhile change is justified when that is the result. Keep independent tool identities, compatibility, source clocks, privacy, model/download costs and publication/deployment permissions intact. Store weights and model-specific caches in the owning project's ignored `models/`.
 
-Submit every improvement as a pull request to [keywordmoves](https://github.com/kieransimkin/keywordmoves/pulls), with relevant tests, documentation and a reproducible example. Follow [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md) for the contribution and validation workflow.
+## Find your route
 
-Project website: [https://kieransimkin.co.uk/danceflow/](https://kieransimkin.co.uk/danceflow/).
-
-## Current plugins
-
-See [multi-source research](docs/multi-source-research.md) for the source/access
-inventory, explicit research plans and source-native evidence limits.
-
-[Free public-source modules](docs/free-public-source-modules.md) covers reviewed
-YT Keyword Tool suggestions and Keywords Everywhere's Google planning context,
-with explicit metric boundaries and a reproducible offline example.
-
-| Plugin | Kind | What it does |
-| --- | --- | --- |
-| `vidiq` | keyword | Offline authorised keyword-result imports and the free public overview, with country scope, rounding, censoring and provider dates intact. See [imports and comparisons](docs/vidiq-benchmark.md) and [free-source checks](docs/free-youtube-volume-sources.md). |
-| `ytkeywordtool` | keyword | Reviewed public suggestions and within-batch tier labels; no invented volume, geography or universal score. |
-| `candidate-focus` | keyword | Explainable literal phrase filtering and matching terms across saved source results; no combined demand score. |
-| `candidate-shortlist` | keyword | Applies an explicit dated editorial review to an exact hashed candidate pool, limits repeated intent groups and reports shortages without padding or changing native metrics. |
-| `research-batch` | keyword | Validates and runs explicit bounded multi-source plans, preserving subjects, units and unavailable tasks. |
-| `seranking` | keyword | Regional third-party keyword estimates and related/question/long-tail language with a documented credit guard; account access requires separate approval. |
-| `wikimedia-pageviews` | keyword | Article-reading attention over declared completed daily windows; no keyword-demand interpretation. |
-| `itunes-catalog` | keyword | Apple song-title, credited artist and genre context without popularity metrics or media downloads. |
-| `google-search` | keyword | Google Search Console, Trends exports, search observations and page audits with source-specific metrics. |
-| `bing-search` | keyword | Bing Webmaster, reviewed search results and keyword planning evidence. |
-| `youtube`, `tiktok`, `instagram`, `reddit` | keyword | Separate platform workbenches for authorised exports, native observations, local reference text and supported providers. Read each module's access and metric limits. |
-| `google-trends` | keyword | Imports Trends CSVs or automatically downloads native YouTube Search interest and related-query exports through an authorised connected browser; preserves relative indices and growth separately from absolute volume. |
-| `keybert` | keyword | Ranks literal reference-text phrases with local sentence embeddings; supports cosine similarity, MMR and Max Sum selection. No generative LLM required. |
-| `nltk` | keyword | Extracts proper nouns, grammar-based noun chunks, named entities and keyphrases locally with NLTK. No LLM required. |
-| `native-export` | keyword | Imports reviewed platform CSV reports with explicit columns, metric units and missing/censored states. |
-| `observed-evidence` | keyword | Validates and imports dated browser, account and public-tool observations without scraping authenticated or private interfaces. |
-| `spacy` | keyword | Extracts proper nouns, noun chunks, named entities and useful noun/adjective phrases from reference text with a local spaCy pipeline. No LLM required. |
-| `text-library` | keyword | Extracts contiguous Unicode phrases and source spans with `extract-literal`, retains legacy local associations, or asks an explicitly selected LLM for semantic proposals. |
-| `huggingface-transformers` | LLM | Runs a local Hugging Face seq2seq or causal instruction model through PyTorch. Its default is the Apache-2.0 `Qwen/Qwen2.5-0.5B-Instruct`, pinned to a reviewed model revision. |
-| `openai` | LLM | Uses OpenAI-hosted text models through the Responses API. Accepts `OPENAI_API_KEY` or `--openai-api-key`; the model is selectable with `--model`. |
-
-Google's official Trends API is currently an access-controlled alpha. The
-built-in plugin therefore supports reproducible CSV exports now rather than
-depending on the archived, unofficial `pytrends` scraper or guessing an API
-contract. Since 0.5.6, `google-trends/collect-browser` and the packaged
-`keywordmoves/browser/google_trends.mjs` helper operate the native CSV download
-and pass the result directly to the existing parser. No manual export/import
-is needed. One plain search term (or up to five matched interest-comparison terms), eight supported countries, three date presets
-and one chosen interest/related-query chart are checked against the visible UI
-and CSV. Interest summaries exclude unfinished periods; source request counts
-remain unknown. An authorised dedicated browser tab/driver is required; the CLI
-does not start a browser. See [automatic collection](docs/automatic-free-collection.md).
-A live official-API backend can be added when access and its exact contract are available.
-
-Since 0.5.7, `google-trends/assess-interest` gives each term its completed-period
-mean index, reporting bounds for `<1` censoring, positive/threshold-zero period
-counts and a rank only within the same comparison export. Separate searches each
-normalise independently: their peaks or means cannot rank demand against one
-another. Missing values stay unavailable; reporting bounds are not statistical
-confidence intervals, and no absolute monthly volume or cross-provider score is
-invented. See [native demand assessment](docs/trends-demand-assessment.md).
-
-Candidate filtering can require multiple independent context groups in 0.5.7:
-`--option "require_groups=song|songs|music;grief|loss|mourning"` keeps literal
-listening context and a relevant topic together. Each semicolon group must match
-at least one pipe-separated alternative. Original metrics stay unchanged and
-every rejected row has a reason; human song-fit review remains necessary.
-See [context filtering](docs/candidate-context.md).
-
-Since 0.5.8, `candidate-shortlist/select` turns a reviewed pool into a reproducible
-shortlist. The caller supplies song fit, listening/navigation intent, wording,
-intent groups and editorial priorities. Exact input hashes and subject/platform
-scope prevent stale or misapplied reviews. Defaults select five direct, natural
-listening targets, at most two from one declared group. Unreviewed or ineligible
-phrases remain excluded; a shortage stays explicit. Priorities are editorial
-choices, not demand scores or proof of the globally best keywords. Native source
-metrics and campaign lifecycle stay unchanged. See [shortlist review](docs/candidate-shortlist.md)
-and the [offline example](examples/candidate_shortlist.py).
-
-## Credentials
-
-Authenticated readers accept explicit CLI options and environment variables.
-The optional `credentials` extra adds opt-in Windows Credential Manager,
-macOS Keychain and Linux Secret Service/KWallet storage, account profiles and
-presence-only management commands. See [credential configuration](docs/credentials.md)
-and [authenticated platform access](docs/authenticated-access.md) for precedence,
-scopes and verification limits. OAuth consent and renewal remain external.
+[Install](#install) · [Use](#use) · [Current plugins](#current-plugins) · [Online keyword sources](#online-keyword-sources) · [Monitor keyword evidence over time](#monitor-keyword-evidence-over-time) · [Credentials](#credentials) · [Write a keyword plugin](#write-a-keyword-plugin) · [Write an LLM plugin](#write-an-llm-plugin) · [Bundled skill](#bundled-skill)
 
 ## Install
 
@@ -329,6 +251,76 @@ budget may be needed; set `--option llm_max_output_tokens=2048` or higher.
 See [docs/openai.md](docs/openai.md) for Bash and Python examples, supported
 options, hosted-data behaviour and troubleshooting.
 
+## Current plugins
+
+See [multi-source research](docs/multi-source-research.md) for the source/access
+inventory, explicit research plans and source-native evidence limits.
+
+[Free public-source modules](docs/free-public-source-modules.md) covers reviewed
+YT Keyword Tool suggestions and Keywords Everywhere's Google planning context,
+with explicit metric boundaries and a reproducible offline example.
+
+| Plugin | Kind | What it does |
+| --- | --- | --- |
+| `vidiq` | keyword | Offline authorised keyword-result imports and the free public overview, with country scope, rounding, censoring and provider dates intact. See [imports and comparisons](docs/vidiq-benchmark.md) and [free-source checks](docs/free-youtube-volume-sources.md). |
+| `ytkeywordtool` | keyword | Reviewed public suggestions and within-batch tier labels; no invented volume, geography or universal score. |
+| `candidate-focus` | keyword | Explainable literal phrase filtering and matching terms across saved source results; no combined demand score. |
+| `candidate-shortlist` | keyword | Applies an explicit dated editorial review to an exact hashed candidate pool, limits repeated intent groups and reports shortages without padding or changing native metrics. |
+| `research-batch` | keyword | Validates and runs explicit bounded multi-source plans, preserving subjects, units and unavailable tasks. |
+| `seranking` | keyword | Regional third-party keyword estimates and related/question/long-tail language with a documented credit guard; account access requires separate approval. |
+| `wikimedia-pageviews` | keyword | Article-reading attention over declared completed daily windows; no keyword-demand interpretation. |
+| `itunes-catalog` | keyword | Apple song-title, credited artist and genre context without popularity metrics or media downloads. |
+| `google-search` | keyword | Google Search Console, Trends exports, search observations and page audits with source-specific metrics. |
+| `bing-search` | keyword | Bing Webmaster, reviewed search results and keyword planning evidence. |
+| `youtube`, `tiktok`, `instagram`, `reddit` | keyword | Separate platform workbenches for authorised exports, native observations, local reference text and supported providers. Read each module's access and metric limits. |
+| `google-trends` | keyword | Imports Trends CSVs or automatically downloads native YouTube Search interest and related-query exports through an authorised connected browser; preserves relative indices and growth separately from absolute volume. |
+| `keybert` | keyword | Ranks literal reference-text phrases with local sentence embeddings; supports cosine similarity, MMR and Max Sum selection. No generative LLM required. |
+| `nltk` | keyword | Extracts proper nouns, grammar-based noun chunks, named entities and keyphrases locally with NLTK. No LLM required. |
+| `native-export` | keyword | Imports reviewed platform CSV reports with explicit columns, metric units and missing/censored states. |
+| `observed-evidence` | keyword | Validates and imports dated browser, account and public-tool observations without scraping authenticated or private interfaces. |
+| `spacy` | keyword | Extracts proper nouns, noun chunks, named entities and useful noun/adjective phrases from reference text with a local spaCy pipeline. No LLM required. |
+| `text-library` | keyword | Extracts contiguous Unicode phrases and source spans with `extract-literal`, retains legacy local associations, or asks an explicitly selected LLM for semantic proposals. |
+| `huggingface-transformers` | LLM | Runs a local Hugging Face seq2seq or causal instruction model through PyTorch. Its default is the Apache-2.0 `Qwen/Qwen2.5-0.5B-Instruct`, pinned to a reviewed model revision. |
+| `openai` | LLM | Uses OpenAI-hosted text models through the Responses API. Accepts `OPENAI_API_KEY` or `--openai-api-key`; the model is selectable with `--model`. |
+
+Google's official Trends API is currently an access-controlled alpha. The
+built-in plugin therefore supports reproducible CSV exports now rather than
+depending on the archived, unofficial `pytrends` scraper or guessing an API
+contract. Since 0.5.6, `google-trends/collect-browser` and the packaged
+`keywordmoves/browser/google_trends.mjs` helper operate the native CSV download
+and pass the result directly to the existing parser. No manual export/import
+is needed. One plain search term (or up to five matched interest-comparison terms), eight supported countries, three date presets
+and one chosen interest/related-query chart are checked against the visible UI
+and CSV. Interest summaries exclude unfinished periods; source request counts
+remain unknown. An authorised dedicated browser tab/driver is required; the CLI
+does not start a browser. See [automatic collection](docs/automatic-free-collection.md).
+A live official-API backend can be added when access and its exact contract are available.
+
+Since 0.5.7, `google-trends/assess-interest` gives each term its completed-period
+mean index, reporting bounds for `<1` censoring, positive/threshold-zero period
+counts and a rank only within the same comparison export. Separate searches each
+normalise independently: their peaks or means cannot rank demand against one
+another. Missing values stay unavailable; reporting bounds are not statistical
+confidence intervals, and no absolute monthly volume or cross-provider score is
+invented. See [native demand assessment](docs/trends-demand-assessment.md).
+
+Candidate filtering can require multiple independent context groups in 0.5.7:
+`--option "require_groups=song|songs|music;grief|loss|mourning"` keeps literal
+listening context and a relevant topic together. Each semicolon group must match
+at least one pipe-separated alternative. Original metrics stay unchanged and
+every rejected row has a reason; human song-fit review remains necessary.
+See [context filtering](docs/candidate-context.md).
+
+Since 0.5.8, `candidate-shortlist/select` turns a reviewed pool into a reproducible
+shortlist. The caller supplies song fit, listening/navigation intent, wording,
+intent groups and editorial priorities. Exact input hashes and subject/platform
+scope prevent stale or misapplied reviews. Defaults select five direct, natural
+listening targets, at most two from one declared group. Unreviewed or ineligible
+phrases remain excluded; a shortage stays explicit. Priorities are editorial
+choices, not demand scores or proof of the globally best keywords. Native source
+metrics and campaign lifecycle stay unchanged. See [shortlist review](docs/candidate-shortlist.md)
+and the [offline example](examples/candidate_shortlist.py).
+
 ## Online keyword sources
 
 Free public collection now connects the reviewed sources to their parsers:
@@ -370,6 +362,44 @@ website query/extraction rules, access limitations and primary-source links.
 The guide distinguishes API adapters from experimental endpoints and report
 imports: no authenticated production access is implied by offline tests.
 
+## Monitor keyword evidence over time
+
+Use private watchlists and a persistent SQLite history to track source-specific
+keyword evidence, missing coverage, stale reports and collection failures.
+Compatible measurements can produce local change alerts; suggestions, rounded
+estimates and differently normalised indices never become one demand score.
+
+~~~powershell
+keywordmoves monitor --store ./private/evidence.sqlite init
+keywordmoves monitor --store ./private/evidence.sqlite watch --input ./watches.json
+keywordmoves monitor --store ./private/evidence.sqlite import --input ./observations.json
+keywordmoves monitor --store ./private/evidence.sqlite report --output ./private/coverage.html
+~~~
+
+[Monitoring guide](docs/monitoring.md) covers histories, provenance, alerts,
+due plans, opt-in bounded first-party collection, shared account quotas and
+retention. [Native CSV exports](docs/native-export.md) covers explicit mappings
+and the twelve-platform coverage matrix. A public-safe synthetic demo is
+included in the installed package:
+
+~~~powershell
+python -m keywordmoves.monitoring.demo --output-dir ./demo-private
+~~~
+
+Monitoring and import are available without network/NLP extras. Collection
+composes existing Google Search Console, YouTube Analytics and Bing Webmaster
+readers; real access still requires an authorised account smoke test. No
+background job, paid request or account setup starts automatically.
+
+## Credentials
+
+Authenticated readers accept explicit CLI options and environment variables.
+The optional `credentials` extra adds opt-in Windows Credential Manager,
+macOS Keychain and Linux Secret Service/KWallet storage, account profiles and
+presence-only management commands. See [credential configuration](docs/credentials.md)
+and [authenticated platform access](docs/authenticated-access.md) for precedence,
+scopes and verification limits. OAuth consent and renewal remain external.
+
 ## Write a keyword plugin
 
 Implement an object with a `descriptor` and `run(request, context)` method, then
@@ -396,6 +426,33 @@ my-local-runtime = "my_package.llm:MyLocalLLM"
 Keyword plugins select it through `context.llms.get(name)`. Model-specific
 options are passed with the `llm_` prefix; for example `--option
 llm_device=cpu` becomes the LLM option `device=cpu`.
+
+## Bundled skill
+
+The repository includes
+[`skills/research-keyword-database`](skills/research-keyword-database/SKILL.md),
+a reusable workflow for inspecting, expanding, researching, validating and
+updating the canonical My Songs keyword register. It keeps KeywordMoves
+candidate generation separate from external demand evidence, requires explicit
+LLM selection, and preserves the register's evidence and lifecycle semantics.
+
+## Current limitations and integration notes
+
+The [authenticated-access guide](docs/authenticated-access.md) documents the
+required first-party read scopes, secure Windows credential injection, bounded
+smoke checks and separate browser, connector and local API access states.
+
+- Python 3.10–3.13 is supported; monitoring uses standard CPython SQLite support. Optional NLP and provider integrations need their documented extras and source permissions.
+- Source text frequency, semantic relevance, search-result samples, platform observations and provider estimates answer different questions. They are not a universal ranking score.
+- Literal extraction preserves contiguous Unicode phrases and source offsets. Its English boundary stopwords are not a language-aware tokenizer; review other languages explicitly.
+- Browser-observation capture paths and hashes are supplied by the caller. The importer preserves their lineage but does not certify the source capture.
+- Online integrations require the access, permissions and charge limits documented in their module guides. A local result limit is not a billing ceiling.
+
+- Monitoring databases and reports can contain private account data; keep them outside public source/packages. Quotas cover only clients sharing the same store and account label.
+
+See [literal extraction](docs/literal-text.md) and [reviewed browser observations](docs/browser-observations.md) for the new operations and reproducible examples.
+
+Authenticated app setup: [client notices and policy boundaries](docs/platform-client-notices.md).
 
 ## Development
 
@@ -426,58 +483,10 @@ real pinned-model smoke test. See [KeyBERT tests](docs/keybert.md#tests).
 See [docs/plugin-opportunities.md](docs/plugin-opportunities.md) for researched
 next-plugin candidates and access constraints.
 
-## Bundled skill
+## Agents and contributors
 
-The repository includes
-[`skills/research-keyword-database`](skills/research-keyword-database/SKILL.md),
-a reusable workflow for inspecting, expanding, researching, validating and
-updating the canonical My Songs keyword register. It keeps KeywordMoves
-candidate generation separate from external demand evidence, requires explicit
-LLM selection, and preserves the register's evidence and lifecycle semantics.
+Agents using KeywordMoves should inspect its available capabilities, use them fully where they fit the task, and look for useful improvements wherever possible. When a required feature is missing, or a reusable reliability, usability, performance or documentation gap is found, improve this tool rather than maintaining a separate workaround. If no worthwhile change is justified, explain why.
 
-## Monitor keyword evidence over time
+Submit every improvement as a pull request to [keywordmoves](https://github.com/kieransimkin/keywordmoves/pulls), with relevant tests, documentation and a reproducible example. Follow [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md) for the contribution and validation workflow.
 
-Use private watchlists and a persistent SQLite history to track source-specific
-keyword evidence, missing coverage, stale reports and collection failures.
-Compatible measurements can produce local change alerts; suggestions, rounded
-estimates and differently normalised indices never become one demand score.
-
-~~~powershell
-keywordmoves monitor --store ./private/evidence.sqlite init
-keywordmoves monitor --store ./private/evidence.sqlite watch --input ./watches.json
-keywordmoves monitor --store ./private/evidence.sqlite import --input ./observations.json
-keywordmoves monitor --store ./private/evidence.sqlite report --output ./private/coverage.html
-~~~
-
-[Monitoring guide](docs/monitoring.md) covers histories, provenance, alerts,
-due plans, opt-in bounded first-party collection, shared account quotas and
-retention. [Native CSV exports](docs/native-export.md) covers explicit mappings
-and the twelve-platform coverage matrix. A public-safe synthetic demo is
-included in the installed package:
-
-~~~powershell
-python -m keywordmoves.monitoring.demo --output-dir ./demo-private
-~~~
-
-Monitoring and import are available without network/NLP extras. Collection
-composes existing Google Search Console, YouTube Analytics and Bing Webmaster
-readers; real access still requires an authorised account smoke test. No
-background job, paid request or account setup starts automatically.
-
-## Current limitations and integration notes
-
-The [authenticated-access guide](docs/authenticated-access.md) documents the
-required first-party read scopes, secure Windows credential injection, bounded
-smoke checks and separate browser, connector and local API access states.
-
-- Python 3.10–3.13 is supported; monitoring uses standard CPython SQLite support. Optional NLP and provider integrations need their documented extras and source permissions.
-- Source text frequency, semantic relevance, search-result samples, platform observations and provider estimates answer different questions. They are not a universal ranking score.
-- Literal extraction preserves contiguous Unicode phrases and source offsets. Its English boundary stopwords are not a language-aware tokenizer; review other languages explicitly.
-- Browser-observation capture paths and hashes are supplied by the caller. The importer preserves their lineage but does not certify the source capture.
-- Online integrations require the access, permissions and charge limits documented in their module guides. A local result limit is not a billing ceiling.
-
-- Monitoring databases and reports can contain private account data; keep them outside public source/packages. Quotas cover only clients sharing the same store and account label.
-
-See [literal extraction](docs/literal-text.md) and [reviewed browser observations](docs/browser-observations.md) for the new operations and reproducible examples.
-
-Authenticated app setup: [client notices and policy boundaries](docs/platform-client-notices.md).
+Project website: [https://kieransimkin.co.uk/danceflow/](https://kieransimkin.co.uk/danceflow/).
