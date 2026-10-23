@@ -96,6 +96,14 @@ Its first model-backed run may download the pinned Sentence Transformers model.
 Text is embedded locally, not sent to a hosted inference API. For prefetching
 and strictly offline use, see [docs/keybert.md](docs/keybert.md).
 
+## Platform-specific hashtag planning
+
+The offline `hashtag-planner` workbench discovers literal tags in permitted captions, preserves source/platform scope, selects only explicitly reviewed direct-fit choices, and audits final copy against exact asset/plan hashes. It rejects stale reviews, unverified trends, generic reach bait and copied cross-platform blocks. Editorial ceilings are experiment limits, not claimed optimal counts; Threads/native metadata destinations receive their own treatment. It performs no publishing or paid collection.
+
+Read [the contract and platform guidance](docs/hashtag-planner.md), then run `python examples/hashtag_planner.py --output example-output` for a reproducible synthetic demonstration. A passing local audit does not prove native persistence or an audience improvement.
+
+![Hashtag evidence, review and copy-audit contract, generated diagram](docs/media/hashtag-planner.svg)
+
 ## Use
 
 List both plugin layers:

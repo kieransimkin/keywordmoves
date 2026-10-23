@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.0 - 2026-10-24
+
+- Add offline hashtag-planner discovery, platform profiles, explicit fit/safety review and exact final-copy audits. Preserve source scope, literal Unicode spelling and evidence; reject stale reviews, irrelevant/generic tags, unverified trends and changed assets/copy. Native topics and metadata remain separate. Counts are editorial ceilings, not proven optima or platform limits. Includes a reproducible synthetic example, explanatory visual and failure-boundary tests. No publishing or paid collection.
+
 ## 0.5.8 - 2026-10-13
 
 - Add offline candidate-shortlist/select for dated, explicit editorial decisions

@@ -49,6 +49,7 @@ def _keyword_builtins() -> dict[str, Callable[[], Any]]:
     from .builtin.candidate_focus import CandidateFocusPlugin
     from .builtin.candidate_shortlist import CandidateShortlistPlugin
     from .builtin.google_trends import GoogleTrendsPlugin
+    from .builtin.hashtag_planner import HashtagPlannerPlugin
     from .builtin.keybert_keywords import KeyBERTKeywordPlugin
     from .builtin.native_export import NativeExportPlugin
     from .builtin.nltk_keywords import NLTKKeywordPlugin
@@ -61,6 +62,7 @@ def _keyword_builtins() -> dict[str, Callable[[], Any]]:
     from .online import factories as online_factories
 
     return {
+        "hashtag-planner": HashtagPlannerPlugin,
         "candidate-focus": CandidateFocusPlugin,
         "candidate-shortlist": CandidateShortlistPlugin,
         "vidiq": VidiqPlugin,

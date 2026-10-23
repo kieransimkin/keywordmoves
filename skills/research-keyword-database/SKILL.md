@@ -10,6 +10,10 @@ Use this skill to maintain the private evidence register at
 KeywordMoves. The register records candidates and evidence; it does not itself
 authorise public page, metadata, advertising, or social-platform changes.
 
+## Hashtag discovery and reviewed use
+
+Read `docs/hashtag-planner.md` for KeywordMoves >=0.6.0 literal capture discovery, explicit exact-asset/platform fit and safety decisions, and final-copy audits. Compose existing native workbenches for real evidence. Keep search phrases, hashtags, native topics/tags and video tags distinct; sample supply and whole-post outcomes never prove per-tag demand or causal reach. In My Songs follow `Workflows/hashtag-discovery-and-use.md` and preserve its guarded 21-column register, platform treatments, freshness, costs, stop rules and approval gates. Proposed/unvalidated candidates stay proposed; inspect audit `metadata.passed` before permitted use. No paid collection, account change or publication is authorised by the tool.
+
 ## Canonical inputs
 
 Read these before changing the register:
