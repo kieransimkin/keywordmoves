@@ -55,7 +55,7 @@ A review expires after 14 days before planned use; non-proposal discovery eviden
 
 ## Final-copy contract
 
-`keywordmoves-hashtag-final-copy/v1` requires `subject`, `platform`, exact `asset_sha256`, exact saved `plan_sha256`, `checked_at`, `caption` and `native_topic` (null outside Threads). This binds the check to the asset and the reviewed plan. `audit` flags unexpected/missing or duplicate tags, ceiling excess, changed topic and expired/unavailable native checks. Hash/scope/asset changes fail. It does not validate total caption length, links, claims, rights, destination accounts, rendered readability or native save/publication. Check those through the owning workflow and independently read back persisted copy.
+`keywordmoves-hashtag-final-copy/v1` requires `subject`, `platform`, exact `asset_sha256`, exact saved `plan_sha256`, `checked_at`, `caption` and `native_topic` (null outside Threads). This binds the check to the asset and the reviewed plan. `audit` flags unexpected/missing or duplicate tags, ceiling excess, changed topic and expired/unavailable native checks. Hash/scope/asset changes fail. The audit receipt retains exact caption/final-copy/asset/plan hashes, platform/subject and check/review/native timestamps so a downstream preflight can bind it to its actual attachment bytes. It does not validate total caption length, links, claims, rights, destination accounts, rendered readability or native save/publication. Check those through the owning workflow and independently read back persisted copy.
 
 ## Learning from use
 

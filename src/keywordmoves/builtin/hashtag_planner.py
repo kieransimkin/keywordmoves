@@ -261,7 +261,7 @@ class HashtagPlannerPlugin:
 
     def _audit(self, inputs):
         raw, plan = _object(inputs[0])
-        _, copy = _object(inputs[1])
+        copy_raw, copy = _object(inputs[1])
         _fields(copy, {"schema", "platform", "subject", "asset_sha256", "plan_sha256", "checked_at", "caption", "native_topic"})
         if copy["schema"] != "keywordmoves-hashtag-final-copy/v1":
             raise InputError("Expected keywordmoves-hashtag-final-copy/v1.")
@@ -294,5 +294,11 @@ class HashtagPlannerPlugin:
         return PluginResult("hashtag-planner", "audit", notes=(
             "Checks supplied copy, not platform acceptance, topic persistence or public publication.",
         ), metadata={"passed": not issues, "issues": issues, "actual_hashtags": actual,
+            "target_subject": copy["subject"], "target_platform": platform,
+            "asset_sha256": copy["asset_sha256"],
+            "caption_sha256": hashlib.sha256(copy["caption"].encode("utf-8")).hexdigest(),
+            "final_copy_sha256": hashlib.sha256(copy_raw).hexdigest(),
+            "checked_at": stamp(copy["checked_at"]), "reviewed_at": meta["reviewed_at"],
+            "native_checked_at": stamp(meta["native_check"]["checked_at"]),
             "native_topic": topic, "plan_sha256": hashlib.sha256(raw).hexdigest(),
             "implementation_authorised": False, "network_requests": 0})

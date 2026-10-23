@@ -175,7 +175,11 @@ def test_plain_keyword_cannot_silently_become_hashtag(tmp_path):
 def test_exact_final_copy_audit_and_unexpected_duplicate_tags(tmp_path):
     _, pp, _, review = fixture(tmp_path)
     result = plan(tmp_path, pp, review)
-    assert run("audit", *final_copy(tmp_path, result)).metadata["passed"] is True
+    audit = run("audit", *final_copy(tmp_path, result))
+    assert audit.metadata["passed"] is True
+    assert audit.metadata["caption_sha256"] == hashlib.sha256(result.metadata["caption_hashtags"].encode()).hexdigest()
+    assert audit.metadata["asset_sha256"] == "a" * 64
+    assert audit.metadata["target_platform"] == "youtube"
     audit = run("audit", *final_copy(tmp_path, result, caption=result.metadata["caption_hashtags"] + " #Viral #Viral"))
     assert set(audit.metadata["issues"]) >= {"caption_tags_differ_from_plan", "duplicate_caption_tags", "editorial_ceiling_exceeded"}
 
