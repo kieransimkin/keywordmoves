@@ -22,3 +22,7 @@ __pycache__/
 
 # Project-local model weights and caches
 models/
+
+# Project-local validation scratch, never evidence or model weights
+.task-temp/
+example-output/
