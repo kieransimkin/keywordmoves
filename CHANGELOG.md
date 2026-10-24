@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.2 - 2026-10-24
+
+- Add offline `google-trends plan-event-cycles`: exact CSV/hash/scope/event bindings, interval-preserving alignment, separate source quality and editorial fit, sparse/coarse/censored/partial abstention, explicit duplicate-capture preferences, independent event counts, chronological whole-cycle timing holdouts and constrained date-window proposals. Reuse the native parser and preserve literal `<1`/missing/zero distinctions. Two cycles remain limited; no cross-request amplitude calibration, absolute searches, learned optimal hour, paid collection, native mutation or reschedule is performed. Includes synthetic regression/example and labelled documentation visual.
+
 ## 0.6.1 - 2026-10-24
 
 - Add separate offline `hashtag-planner plan-native` / `audit-native` contracts for text-only edits to existing native posts. Bind exact platform/account/object identity and captured baseline bytes; audit tags across complete title/description/caption/post fields with per-field and final-copy hashes. Preserve direct fit, safety, trend, topic and freshness checks. No original media hash is invented, media provenance is explicitly unchecked, and existing asset-bound plan/audit contracts remain unchanged. No native mutation or publication permission is implied.
