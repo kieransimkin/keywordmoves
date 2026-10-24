@@ -9,7 +9,15 @@ from datetime import datetime
 
 from ..errors import ConfigurationError, InputError
 from ..models import KeywordCandidate, KeywordEvidence, PluginDescriptor, PluginResult
-from ..monitoring.validation import canonical, label, normal, read_json, reject_secrets, stamp
+from ..monitoring.validation import (
+    canonical,
+    digest,
+    label,
+    normal,
+    read_json,
+    reject_secrets,
+    stamp,
+)
 from ..online.youtube_analysis import hashtag, hashtag_spans
 
 # Conservative editorial ceilings, NOT platform limits or proven optimal counts.
@@ -73,11 +81,47 @@ def _tag(value):
     return tag
 
 
+def _native_target(data):
+    _fields(data, {"account_id", "object_id", "before_metadata_sha256"})
+    for key in ("account_id", "object_id"):
+        if data[key] != label(data[key], key):
+            raise InputError("Native identifiers must be exact, without normalization or surrounding space.")
+    _hash(data["before_metadata_sha256"])
+    return data
+
+
+def _native_fields(value):
+    # Only human-readable copy: not video tags, visibility, schedules or media.
+    if not isinstance(value, dict) or not value or set(value) - {"title", "description", "caption", "post"}:
+        raise InputError("Native fields require named title/description/caption/post text.")
+    if any(not isinstance(text, str) or len(text) > 100000 for text in value.values()):
+        raise InputError("Native field text must be at most 100000 characters per field.")
+    return value
+
+
+def _native_before(path, subject, platform, target, checked_at):
+    raw, before = _object(path)
+    _fields(before, {"schema", "subject", "platform", "account_id", "object_id", "captured_at", "fields", "native_topic"})
+    if before["schema"] != "keywordmoves-native-metadata/v1":
+        raise InputError("Expected keywordmoves-native-metadata/v1.")
+    if (before["subject"] != subject or before["platform"] != platform
+            or any(before[k] != target[k] for k in ("account_id", "object_id"))
+            or hashlib.sha256(raw).hexdigest() != target["before_metadata_sha256"]):
+        raise InputError("Native object/account/scope/baseline hash differ from review.")
+    _native_fields(before["fields"])
+    if before["native_topic"] is not None:
+        label(before["native_topic"], "native topic")
+        if platform != "threads":
+            raise InputError("native_topic is reserved for Threads.")
+    _age(checked_at, before["captured_at"])
+    return before
+
+
 class HashtagPlannerPlugin:
     descriptor = PluginDescriptor(
         "hashtag-planner", "Discover literal tags in permitted captures, review scoped sets and audit final copy.",
         ("hashtags", "offline", "editorial-review", "caption-audit"),
-        ("profiles", "discover", "plan", "audit"),
+        ("profiles", "discover", "plan", "audit", "plan-native", "audit-native"),
     )
 
     def run(self, request, context):
@@ -90,9 +134,13 @@ class HashtagPlannerPlugin:
             return PluginResult("hashtag-planner", "profiles", metadata={
                 "profiles": {k: {"editorial_ceiling": v[0], "surface": v[1]} for k, v in PROFILES.items()},
                 "not_platform_limits_or_optimal_counts": True, "network_requests": 0})
-        expected = {"discover": 1, "plan": 2, "audit": 2}
+        expected = {"discover": 1, "plan": 2, "audit": 2, "plan-native": 3, "audit-native": 3}
         if request.operation not in expected or len(request.inputs) != expected[request.operation] or request.options:
-            raise ConfigurationError("discover: capture; plan: pool then review; audit: plan then final-copy JSON. No options.")
+            raise ConfigurationError("discover: capture; plan: pool/review; audit: plan/copy; plan-native: pool/review/baseline; audit-native: plan/baseline/copy. No options.")
+        if request.operation == "plan-native":
+            return self._plan(request.inputs, native_metadata=True)
+        if request.operation == "audit-native":
+            return self._audit_native(request.inputs)
         return getattr(self, "_" + request.operation)(request.inputs)
 
     def _discover(self, inputs):
@@ -142,20 +190,26 @@ class HashtagPlannerPlugin:
             "target_platform": platform, "captured_at": captured, "source_kind": kind,
             "source_sha256": hashlib.sha256(raw).hexdigest(), "record_count": len(records), "network_requests": 0})
 
-    def _plan(self, inputs):
+    def _plan(self, inputs, native_metadata=False):
         raw, pool = _object(inputs[0])
         review_raw, review = _object(inputs[1])
-        _fields(review, {"schema", "subject", "platform", "reviewed_at", "planned_for", "asset_sha256",
+        _fields(review, {"schema", "subject", "platform", "reviewed_at", "planned_for", "native_target" if native_metadata else "asset_sha256",
             "source_sha256", "native_check", "decisions"}, {"native_topic"})
-        if review["schema"] != "keywordmoves-hashtag-review/v1":
-            raise InputError("Expected keywordmoves-hashtag-review/v1.")
+        review_schema = "keywordmoves-hashtag-native-review/v1" if native_metadata else "keywordmoves-hashtag-review/v1"
+        if review["schema"] != review_schema:
+            raise InputError(f"Expected {review_schema}.")
         source_sha = hashlib.sha256(raw).hexdigest()
         if review["source_sha256"] != source_sha:
             raise InputError("Review source hash is stale or refers to other bytes.")
         subject, platform = label(review["subject"], "subject"), _platform(review["platform"])
         reviewed, planned = stamp(review["reviewed_at"]), stamp(review["planned_for"])
         review_age = _age(planned, reviewed)
-        asset = _hash(review["asset_sha256"])
+        binding = {"asset_sha256": _hash(review["asset_sha256"])} if not native_metadata else {
+            "native_target": _native_target(review["native_target"]), "target_kind": "existing_native_metadata",
+            "media_provenance_checked": False}
+        if native_metadata:
+            before = _native_before(inputs[2], subject, platform, binding["native_target"], reviewed)
+            binding["before_captured_at"] = stamp(before["captured_at"])
         topic = review.get("native_topic")
         if topic is not None:
             label(topic, "native topic")
@@ -247,17 +301,78 @@ class HashtagPlannerPlugin:
                 metadata={**candidate.metadata, "role": row["role"], "rationale": row["rationale"],
                     "editorial_priority": row["priority"], "normalized_tag": tag}))
         needs_check = native["state"] != "checked" or native_age > 7 or review_age > 14
+        if "native_target" in binding and _age(planned, binding["before_captured_at"]) > 7:
+            needs_check = True
         state = "needs_native_recheck" if needs_check else "native_surface" if ceiling == 0 else "reviewed_proposal"
-        return PluginResult("hashtag-planner", "plan", tuple(selected), (
+        is_native = "native_target" in binding
+        return PluginResult("hashtag-planner", "plan-native" if is_native else "plan", tuple(selected), (
             "Counts are editorial ceilings, not platform limits or proven optima; zero tags is valid.",
             "Reviews/native-check claims are supplied by the caller; this tool cannot verify them.",
             "No public use is authorised and no reach improvement is demonstrated.",
-        ), {"schema": "keywordmoves-hashtag-plan/v1", "target_subject": subject, "target_platform": platform,
-            "asset_sha256": asset, "source_sha256": source_sha, "review_sha256": hashlib.sha256(review_raw).hexdigest(),
+        ), {"schema": "keywordmoves-hashtag-native-plan/v1" if is_native else "keywordmoves-hashtag-plan/v1", "target_subject": subject, "target_platform": platform,
+            **binding, "source_sha256": source_sha, "review_sha256": hashlib.sha256(review_raw).hexdigest(),
             "reviewed_at": reviewed, "planned_for": planned, "native_check": native, "native_topic": topic,
             "state": state, "surface": surface, "editorial_ceiling": ceiling,
             "caption_hashtags": " ".join(c.phrase for c in selected), "rejected": rejected,
             "implementation_authorised": False, "network_requests": 0})
+
+    def _audit_native(self, inputs):
+        raw, plan = _object(inputs[0])
+        copy_raw, copy = _object(inputs[2])
+        _fields(copy, {"schema", "subject", "platform", "native_target", "plan_sha256", "checked_at", "fields", "native_topic"})
+        if copy["schema"] != "keywordmoves-hashtag-native-final-copy/v1":
+            raise InputError("Expected keywordmoves-hashtag-native-final-copy/v1.")
+        meta = plan.get("metadata")
+        if (not isinstance(meta, dict) or meta.get("schema") != "keywordmoves-hashtag-native-plan/v1"
+                or plan.get("operation") != "plan-native" or plan.get("plugin") != "hashtag-planner"
+                or meta.get("target_kind") != "existing_native_metadata"):
+            raise InputError("Expected a saved native metadata plan, not an asset-bound plan.")
+        platform = _platform(copy["platform"])
+        target = _native_target(copy["native_target"])
+        if (meta.get("target_subject") != copy["subject"] or meta.get("target_platform") != platform
+                or meta.get("native_target") != target or hashlib.sha256(raw).hexdigest() != _hash(copy["plan_sha256"])):
+            raise InputError("Final native scope/object/account/baseline/plan differ from plan.")
+        before = _native_before(inputs[1], copy["subject"], platform, target, copy["checked_at"])
+        fields = _native_fields(copy["fields"])
+        if set(fields) != set(before["fields"]):
+            raise InputError("Final fields must match the complete baseline field set.")
+        topic = copy["native_topic"]
+        if topic is not None:
+            label(topic, "native topic")
+            if platform != "threads":
+                raise InputError("native_topic is reserved for Threads.")
+        expected = [_tag(c["phrase"]) for c in plan.get("keywords", [])]
+        actual = [_tag(text[start:end]) for text in fields.values() for _, start, end in hashtag_spans(text)]
+        issues = self._copy_issues(meta, actual, expected, topic, copy["checked_at"], platform)
+        if _age(copy["checked_at"], before["captured_at"]) > 7:
+            issues.append("native_baseline_recheck_required")
+        return PluginResult("hashtag-planner", "audit-native", notes=(
+            "Checks supplied native metadata only; does not verify media bytes, ownership, native save or publication.",
+            "Re-read the same account/object and baseline immediately before an authorised edit; independently audit its saved readback.",
+        ), metadata={"schema": "keywordmoves-hashtag-native-audit/v1", "passed": not issues,
+            "issues": issues, "actual_hashtags": actual, "target_kind": "existing_native_metadata",
+            "target_subject": copy["subject"], "target_platform": platform, "native_target": target,
+            "before_captured_at": stamp(before["captured_at"]), "before_fields_sha256": digest(before["fields"]),
+            "fields_sha256": digest(fields), "field_sha256": {k: hashlib.sha256(v.encode("utf-8")).hexdigest() for k, v in fields.items()},
+            "final_copy_sha256": hashlib.sha256(copy_raw).hexdigest(), "checked_at": stamp(copy["checked_at"]),
+            "reviewed_at": meta["reviewed_at"], "native_checked_at": stamp(meta["native_check"]["checked_at"]),
+            "native_topic": topic, "plan_sha256": hashlib.sha256(raw).hexdigest(),
+            "media_provenance_checked": False, "implementation_authorised": False, "network_requests": 0})
+
+    @staticmethod
+    def _copy_issues(meta, actual, expected, topic, checked_at, platform):
+        issues = []
+        if Counter(expected) != Counter(actual):
+            issues.append("caption_tags_differ_from_plan")
+        if len(actual) != len(set(actual)):
+            issues.append("duplicate_caption_tags")
+        if len(actual) > PROFILES[platform][0]:
+            issues.append("editorial_ceiling_exceeded")
+        if meta.get("state") == "needs_native_recheck" or _age(checked_at, meta["reviewed_at"]) > 14 or _age(checked_at, meta["native_check"]["checked_at"]) > 7:
+            issues.append("native_recheck_required")
+        if topic != meta.get("native_topic"):
+            issues.append("native_topic_differs_from_plan")
+        return issues
 
     def _audit(self, inputs):
         raw, plan = _object(inputs[0])
@@ -280,17 +395,7 @@ class HashtagPlannerPlugin:
                 raise InputError("native_topic is reserved for Threads.")
         expected = [_tag(c["phrase"]) for c in plan.get("keywords", [])]
         actual = [_tag(copy["caption"][start:end]) for _, start, end in hashtag_spans(copy["caption"])]
-        issues = []
-        if Counter(expected) != Counter(actual):
-            issues.append("caption_tags_differ_from_plan")
-        if len(actual) != len(set(actual)):
-            issues.append("duplicate_caption_tags")
-        if len(actual) > PROFILES[platform][0]:
-            issues.append("editorial_ceiling_exceeded")
-        if meta.get("state") == "needs_native_recheck" or _age(copy["checked_at"], meta["reviewed_at"]) > 14 or _age(copy["checked_at"], meta["native_check"]["checked_at"]) > 7:
-            issues.append("native_recheck_required")
-        if topic != meta.get("native_topic"):
-            issues.append("native_topic_differs_from_plan")
+        issues = self._copy_issues(meta, actual, expected, topic, copy["checked_at"], platform)
         return PluginResult("hashtag-planner", "audit", notes=(
             "Checks supplied copy, not platform acceptance, topic persistence or public publication.",
         ), metadata={"passed": not issues, "issues": issues, "actual_hashtags": actual,
