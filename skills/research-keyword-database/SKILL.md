@@ -20,6 +20,8 @@ For separately authorised human-readable text edits to an identified existing na
 
 *Generated contract illustration; use the executable synthetic example for local behaviour. A screenshot/video would not demonstrate native persistence unless an independently authorised actual edit took place.*
 
+For an authorised recurring-event timing question, KeywordMoves >=0.6.2 adds offline `google-trends plan-event-cycles`. Read `docs/event-cycles.md` before preparing its hash/scope/event-bound manifest. Preserve native CSV `<1` censors, raw display resolution and completed-bin intervals; sparse/coarse/partial cycles abstain rather than become zero demand or a rescaled certainty. Keep the analyst's direct/context/reject fit and listening intent separate from data quality. Multiple captures of one event are not extra cycles. Two cycles remain limited; chronological whole-cycle checks on three or more are retrospective, not calibrated forecast probabilities. Date-window proposals use declared editorial lead/constraint dates, never a learned hour, native save or automatic reschedule. Source-qualified timing evidence remains separate from song/native-platform demand and the guarded register's proposed/adopted state. Use the executable synthetic example and labelled diagram in the guide; real application evidence and publication retain their own authority.
+
 ## Canonical inputs
 
 Read these before changing the register:

@@ -88,10 +88,13 @@ class GoogleTrendsPlugin:
         name="google-trends",
         summary="Normalise Google Trends CSV exports into keyword evidence.",
         capabilities=("discover", "analyse", "relative-popularity"),
-        operations=("import-interest", "import-related", "collect-browser", "assess-interest"),
+        operations=("import-interest", "import-related", "collect-browser", "assess-interest", "plan-event-cycles"),
     )
 
     def run(self, request: PluginRequest, context: ExecutionContext) -> PluginResult:
+        if request.operation == "plan-event-cycles":
+            from .event_cycles import plan_event_cycles
+            return plan_event_cycles(request)
         if request.operation == "collect-browser":
             from ..trends_browser import collect_browser
             return collect_browser(request, context)

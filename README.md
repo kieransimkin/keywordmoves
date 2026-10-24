@@ -96,6 +96,16 @@ Its first model-backed run may download the pinned Sentence Transformers model.
 Text is embedded locally, not sent to a hosted inference API. For prefetching
 and strictly offline use, see [docs/keybert.md](docs/keybert.md).
 
+## Event-aligned keyword timing
+
+The offline `google-trends plan-event-cycles` operation aligns explicitly supplied historical CSVs to verified event dates, preserving each source's query/scope/hash, independent normalization and raw censoring. It separates input quality from musical relevance, abstains on sparse/low-resolution/incomplete cycles, counts distinct non-overlapping events, and reports chronological whole-cycle holdouts when possible. Two cycles stay limited. Optional declared publishing leads/date constraints produce reviewed **date-window proposals**; no optimal hour, native save, reschedule, volume or cross-platform demand is inferred.
+
+Read [the exact contract, quality rules and limits](docs/event-cycles.md). Run `python examples/event_cycles.py --output event-example-output` for a real offline demonstration using clearly synthetic indices. Retrospective sampled curves and one successful holdout are not calibrated forecast probabilities.
+
+![Event source quality, timing holdouts and separate editorial scheduling](docs/media/event-cycles.svg)
+
+*Generated explanatory diagram, not a native interface or a measured campaign result.*
+
 ## Platform-specific hashtag planning
 
 The offline `hashtag-planner` workbench discovers literal tags in permitted captions, preserves source/platform scope, selects only explicitly reviewed direct-fit choices, and audits final copy against exact asset/plan hashes. For an authorised text-only edit to an existing native post, separate `plan-native` / `audit-native` operations bind the exact platform/account/object and captured metadata baseline, without claiming an original media hash or checking media provenance. Both paths reject stale reviews, unverified trends, generic reach bait and copied cross-platform blocks. Editorial ceilings are experiment limits, not claimed optimal counts; Threads/native metadata destinations receive their own treatment. It performs no publishing or paid collection.

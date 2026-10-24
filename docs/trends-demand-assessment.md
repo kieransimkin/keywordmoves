@@ -59,6 +59,13 @@ node --test tests/browser_google_trends.test.mjs
 Primary sources: [comparison guide](https://support.google.com/trends/answer/4359550)
 and [normalization, thresholds and noise](https://support.google.com/trends/answer/4365533).
 
+For recurring events, the separate offline `plan-event-cycles` operation adds
+source-bound calendar alignment, quality/intent separation, chronological
+whole-cycle holdouts and conditional date-window proposals. Read
+[the event-cycle contract](event-cycles.md). Existing `assess-interest` summaries
+remain unchanged; their relative indices do not become absolute searches or a
+learned publishing hour.
+
 ## Visible source display failure
 
 A normal query can display “Oops! There was a problem displaying this page”.
