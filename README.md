@@ -98,9 +98,11 @@ and strictly offline use, see [docs/keybert.md](docs/keybert.md).
 
 ## Platform-specific hashtag planning
 
-The offline `hashtag-planner` workbench discovers literal tags in permitted captions, preserves source/platform scope, selects only explicitly reviewed direct-fit choices, and audits final copy against exact asset/plan hashes. It rejects stale reviews, unverified trends, generic reach bait and copied cross-platform blocks. Editorial ceilings are experiment limits, not claimed optimal counts; Threads/native metadata destinations receive their own treatment. It performs no publishing or paid collection.
+The offline `hashtag-planner` workbench discovers literal tags in permitted captions, preserves source/platform scope, selects only explicitly reviewed direct-fit choices, and audits final copy against exact asset/plan hashes. For an authorised text-only edit to an existing native post, separate `plan-native` / `audit-native` operations bind the exact platform/account/object and captured metadata baseline, without claiming an original media hash or checking media provenance. Both paths reject stale reviews, unverified trends, generic reach bait and copied cross-platform blocks. Editorial ceilings are experiment limits, not claimed optimal counts; Threads/native metadata destinations receive their own treatment. It performs no publishing or paid collection.
 
 Read [the contract and platform guidance](docs/hashtag-planner.md), then run `python examples/hashtag_planner.py --output example-output` for a reproducible synthetic demonstration. A passing local audit does not prove native persistence or an audience improvement.
+
+Run `python examples/native_metadata_audit.py --output native-example-output` for the separate existing-post contract. Keep new-upload audits bound to actual media bytes; native metadata receipts cannot replace them.
 
 ![Hashtag evidence, review and copy-audit contract, generated diagram](docs/media/hashtag-planner.svg)
 

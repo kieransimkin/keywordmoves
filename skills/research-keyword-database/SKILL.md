@@ -14,6 +14,12 @@ authorise public page, metadata, advertising, or social-platform changes.
 
 Read `docs/hashtag-planner.md` for KeywordMoves >=0.6.0 literal capture discovery, explicit exact-asset/platform fit and safety decisions, and final-copy audits. Compose existing native workbenches for real evidence. Keep search phrases, hashtags, native topics/tags and video tags distinct; sample supply and whole-post outcomes never prove per-tag demand or causal reach. In My Songs follow `Workflows/hashtag-discovery-and-use.md` and preserve its guarded 21-column register, platform treatments, freshness, costs, stop rules and approval gates. Proposed/unvalidated candidates stay proposed; inspect audit `metadata.passed` before permitted use. No paid collection, account change or publication is authorised by the tool.
 
+For separately authorised human-readable text edits to an identified existing native post, KeywordMoves >=0.6.1 offers `plan-native` / `audit-native`: exact platform/account/object, complete captured baseline bytes, complete final fields and copy hashes. Read the native contract/example in the same guide. Never fabricate media hashes or substitute a native receipt for an upload's asset-bound audit. Native metadata checks do not establish ownership, master/clock provenance, eligibility or a saved change. Independently re-read the original fields before editing and the complete persisted fields afterwards; compare media, visibility, native tags and schedule/settings separately. This research skill itself still grants no publishing authority.
+
+![Separate media and existing native metadata bindings](../../docs/media/native-metadata-audit.svg)
+
+*Generated contract illustration; use the executable synthetic example for local behaviour. A screenshot/video would not demonstrate native persistence unless an independently authorised actual edit took place.*
+
 ## Canonical inputs
 
 Read these before changing the register:

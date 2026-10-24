@@ -59,6 +59,28 @@ A review expires after 14 days before planned use; non-proposal discovery eviden
 
 ## Learning from use
 
+### Text-only edits to an existing native post (0.6.1)
+
+Use the separate `plan-native` / `audit-native` contract when an existing native object is independently identified and the authorised action changes only its human-readable text. An original upload file may be unavailable. Do not invent its hash, use a video ID as a media hash, or claim the asset-bound `audit` passed. Native metadata audits never establish original master/clock mapping, media eligibility, ownership, replacement permission or publication. Those duties stay with their owning workflows.
+
+![Separate media and existing native metadata bindings](media/native-metadata-audit.svg)
+
+*Generated contract illustration, not a native interface capture. Both runnable examples execute real offline checks with explicitly synthetic evidence; no video demonstration or audience screenshot would prove native persistence or media provenance.*
+
+```powershell
+python examples/native_metadata_audit.py --output native-example-output
+keywordmoves run hashtag-planner --operation plan-native --input pool.json --input native-review.json --input before.json
+keywordmoves run hashtag-planner --operation audit-native --input native-plan.json --input before.json --input native-final-copy.json
+```
+
+1. Save a complete permitted native text snapshot as `keywordmoves-native-metadata/v1`: `subject`, lowercase `platform`, exact `account_id`, exact `object_id`, `captured_at`, `fields`, and `native_topic` (null outside Threads). `fields` is a non-empty object of text-valued `title`, `description`, `caption` and/or `post` keys. Capture complete field contents from the editor or supported API: a truncated list preview is insufficient. Every supplied field allows at most 100,000 characters. Video tags, mentions/settings objects, media, visibility and schedule controls are outside this contract.
+2. Use `keywordmoves-hashtag-native-review/v1` with the same fields and decisions as the asset review, replacing `asset_sha256` with `native_target={"account_id":"EXACT_ACCOUNT","object_id":"EXACT_OBJECT","before_metadata_sha256":"SHA256_OF_BEFORE_JSON_BYTES"}`. Account/object identifiers are opaque and exact; normalization or surrounding space is rejected. `plan-native` takes pool, review, then baseline. It applies the existing source hashes, direct-fit/safety/role/trend selection and native-context freshness checks. Baselines also require refresh within seven days under this conservative project rule. Caller identity and context assertions still require independent evidence.
+3. Save `keywordmoves-hashtag-native-final-copy/v1` containing `subject`, `platform`, the identical `native_target`, exact saved `plan_sha256`, `checked_at`, complete `fields`, and `native_topic`. Supply exactly the baseline's field names, including unchanged ones. `audit-native` takes plan, baseline, final copy; it rejects account/object/scope/baseline/plan swaps and audits hashtags across **all** fields, including unexpected or repeated tags in the title. No tag can be hidden in an earlier field. Zero tags remains valid; Threads topics remain separate.
+
+Inspect `metadata.passed`. The receipt has schema `keywordmoves-hashtag-native-audit/v1`, `target_kind=existing_native_metadata`, the exact native target, baseline capture/hash, canonical `before_fields_sha256` / `fields_sha256`, per-field UTF-8 `field_sha256`, final-document/plan hashes, selected/actual tags and relevant check dates. Field-object hashes use sorted compact JSON, UTF-8, literal Unicode and no ASCII escaping (the shared `monitoring.validation.digest` function). `media_provenance_checked=false` and `implementation_authorised=false` are explicit; `asset_sha256` is absent. Existing new-upload consumers must continue accepting only their asset-bound receipt, never this schema.
+
+Immediately before an authorised native edit, independently re-read the same account/object and compare complete text with the baseline. Stop on a conflicting change and prepare a fresh review. After saving, independently reload the same object, preserve the complete actual accepted fields and audit that readback against the reviewed plan/baseline. A clean local audit is a supplied-copy result, not a receipt from the platform. Preserve media, visibility, rights, native tags and approved date/time/timezone through separate comparisons. Missing master-clock provenance can remain a precise media hold while a truthful, unrelated text repair proceeds under its own authority.
+
 Record proposed, reviewed, scheduled, published and independently verified states separately. Join actual persisted tags to the exact asset hash/post ID, native account/format, source evidence and next review window. Compare like-for-like content at the same age; retain views/reach denominators, retention, search referrals, saves, meaningful replies, follows and landing-page outcomes when actually available. Whole-post success cannot be assigned to each tag. A small uncontrolled comparison is descriptive, not a causal lift claim.
 
 ## Primary references and access limits
