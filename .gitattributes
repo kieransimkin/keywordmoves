@@ -3,3 +3,36 @@
 # Keep original DanceFlow artwork byte-identical across platform packages.
 **/branding/*.svg text eol=lf
 **/branding/*.png binary
+
+# Canonical cross-platform checkout policy.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.7z binary
+*.wasm binary
+*.whl binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.mp3 binary
+*.wav binary
+*.flac binary
+*.mp4 binary
+*.webm binary
+*.onnx binary
+*.safetensors binary
+*.gguf binary
+*.exe binary
+*.dll binary
+*.so binary
+*.dylib binary
