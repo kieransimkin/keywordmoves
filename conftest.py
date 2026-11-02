@@ -6,8 +6,8 @@ import hashlib
 import os
 import shutil
 import uuid
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Mapping
 
 import pytest
 
@@ -24,7 +24,6 @@ def default_temp_root(
     checkout = Path(checkout).resolve()
     if platform == "nt":
         base = Path(current_environment.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local")
-        key = hashlib.sha256(str(checkout).casefold().encode("utf-8")).hexdigest()[:12]
         return base / checkout.name / "pytest-tmp"
     return checkout / ".pytest-tmp"
 
