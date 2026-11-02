@@ -25,8 +25,17 @@ def default_temp_root(
     if platform == "nt":
         base = Path(current_environment.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local")
         key = hashlib.sha256(str(checkout).casefold().encode("utf-8")).hexdigest()[:12]
-        return base / checkout.name / "pytest" / key
+        return base / checkout.name / "pytest-tmp"
     return checkout / ".pytest-tmp"
+
+
+def _new_run_root(checkout: Path) -> Path:
+    """Return a fresh root so a killed run can never poison the next run."""
+    checkout = checkout.resolve()
+    key = hashlib.sha256(str(checkout).casefold().encode("utf-8")).hexdigest()[:12]
+    return default_temp_root(checkout) / (
+        f"direct-{key}-{os.getpid()}-{uuid.uuid4().hex}"
+    )
 
 
 def _probe_temp_root(root: Path) -> None:
@@ -53,7 +62,8 @@ def pytest_configure(config: pytest.Config) -> None:
     """Redirect pytest's default tmp_path fixtures unless the caller chose a root."""
     if config.getoption("basetemp") is not None or os.environ.get("PYTEST_DEBUG_TEMPROOT"):
         return
-    root = default_temp_root(Path(config.rootpath))
+    root = _new_run_root(Path(config.rootpath))
     _probe_temp_root(root)
     os.environ["PYTEST_DEBUG_TEMPROOT"] = str(root)
-    config.inicfg["cache_dir"] = str(root / "cache")
+    config._inicache["cache_dir"] = str(root / "cache")
+    config.add_cleanup(lambda: shutil.rmtree(root, ignore_errors=True))
