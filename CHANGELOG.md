@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.3 - 2026-11-02
+
+- Isolate Windows pytest process, fixture and cache paths in a probed, unique LocalAppData run root with cleanup.
+- Normalize Git text to LF across platforms while retaining CRLF for Windows command scripts.
+
 ## 0.6.2 - 2026-10-24
 
 - Add offline `google-trends plan-event-cycles`: exact CSV/hash/scope/event bindings, interval-preserving alignment, separate source quality and editorial fit, sparse/coarse/censored/partial abstention, explicit duplicate-capture preferences, independent event counts, chronological whole-cycle timing holdouts and constrained date-window proposals. Reuse the native parser and preserve literal `<1`/missing/zero distinctions. Two cycles remain limited; no cross-request amplitude calibration, absolute searches, learned optimal hour, paid collection, native mutation or reschedule is performed. Includes synthetic regression/example and labelled documentation visual.
