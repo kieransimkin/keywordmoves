@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.4 - 2026-11-05
+
+- Add the local PixelCue visual keyword adapter and keyword-only JSON output.
+
 ## 0.6.3 - 2026-11-02
 
 - Isolate Windows pytest process, fixture and cache paths in a probed, unique LocalAppData run root with cleanup.

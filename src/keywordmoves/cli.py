@@ -81,7 +81,7 @@ def build_parser() -> argparse.ArgumentParser:
         "Prefer the environment to avoid exposing keys in shell history or process arguments.",
     )
     run.add_argument("--option", action="append", type=_option, default=[])
-    run.add_argument("--format", choices=("json", "text"), default="json")
+    run.add_argument("--format", choices=("json", "text", "keywords"), default="json")
     from .monitoring.cli import configure
 
     configure(subparsers)
@@ -179,6 +179,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         )
         if args.format == "json":
             print(json.dumps(result.to_dict(), indent=2, ensure_ascii=False))
+        elif args.format == "keywords":
+            print(json.dumps([item.phrase for item in result.keywords], ensure_ascii=False))
         else:
             _print_text(result)
         return 0
