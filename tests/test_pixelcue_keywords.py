@@ -63,7 +63,7 @@ def test_pixelcue_rejects_invalid_options_before_transport(option, tmp_path, mon
     (b'{"tags": ["invalid shape"]}', "list of strings"),
     (b"\xff", "malformed UTF-8 JSON"),
     (b" " * (MAX_RESPONSE_BYTES + 1), "exceeds 1 MiB"),
-])
+], ids=["shape", "utf8", "size"])
 def test_pixelcue_rejects_invalid_responses(response, message, tmp_path, monkeypatch, capsys):
     source = tmp_path / "cover.png"
     source.write_bytes(b"synthetic fixture")
