@@ -23,6 +23,19 @@ It keeps two plugin systems deliberately separate:
 A keyword plugin that needs generative LLM inference must ask for an LLM plugin
 by name. It must not import or silently select a model provider of its own.
 
+## Visual keywords from PixelCue
+
+Start a local [PixelCue service](https://github.com/kieransimkin/PixelCue) with
+a configured model, then request keyword proposals for a file accessible to
+that service.
+
+```sh
+keywordmoves run pixelcue --operation extract --input cover.png --format keywords
+```
+
+The default JSON format keeps source and evidence metadata. The keyword-only
+format emits a bare JSON array. See the [adapter guide](docs/pixelcue.md).
+
 ## Before every new workflow
 
 Check the latest stable official release and the actual installed/imported version before starting; do not infer currency from a directory name or a development checkout. Read the current release notes, tagged capability documentation and relevant Potential problems. Use the [DanceFlow release preflight](https://github.com/kieransimkin/DanceFlow/blob/main/docs/workflows/release-preflight.md) and [complete capability references](https://github.com/kieransimkin/DanceFlow/blob/main/docs/capabilities/index.md).
